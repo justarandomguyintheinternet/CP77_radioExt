@@ -1,0 +1,5 @@
+
+*.sqlite3
+.vscode/settings.json
+*.log
+radios/radiosInfo.json
