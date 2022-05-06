@@ -25,13 +25,13 @@ jobs:
         run: |
           cd src
           xmake
-          dir
       - name: Copy files
         run: |
           xcopy init.lua \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy metadata.json \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy modules \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules /e
-          dir
+          xcopy radios \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios /e
+          xcopy io\out \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\io\out /e
           xcopy D:\a\CP77_radioExt\CP77_radioExt\src\build\windows\x64\release\radioExt.asi \packed\bin\x64\plugins\ /e
       - name: Upload zip
         uses: actions/upload-artifact@v2

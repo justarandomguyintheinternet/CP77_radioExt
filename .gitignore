@@ -3,3 +3,6 @@
 .vscode/settings.json
 *.log
 radios/radiosInfo.json
+radios/buryTheLightFM/metadata.json
+radios/buryTheLightFM/songInfos.json
+*.mp3
