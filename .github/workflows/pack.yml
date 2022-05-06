@@ -24,7 +24,7 @@ jobs:
           cd src
           xmake
           dir
-          cd \build\windows\x64\release\
+          cd \packed\src\build\windows\x64\release\
           dir
           xcopy radioExt.asi \packed\bin\x64\plugins\
       - name: Copy files
