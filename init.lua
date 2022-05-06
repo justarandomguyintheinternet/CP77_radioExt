@@ -12,7 +12,8 @@ radio = {
         inMenu = false,
         inGame = false,
         time = nil,
-        hibernate = false
+        hibernate = false,
+        ts = nil
     },
     GameUI = require("modules/GameUI"),
     config = require("modules/config"),
@@ -43,6 +44,7 @@ function radio:new()
         end)
 
         self.observers.init(self)
+        self.runtimeData.ts = GetMod("trainSystem")
 
         self.runtimeData.inGame = not self.GameUI.IsDetached() -- Required to check if ingame after reloading all mods
     end)
@@ -55,6 +57,7 @@ function radio:new()
         if (not self.runtimeData.inMenu) and self.runtimeData.inGame and not self.runtimeData.hibernate then
             self.Cron.Update(delta)
             self.radioManager:update()
+            self.radioManager:handleTS()
         elseif not self.runtimeData.hibernate then
             self.radioManager:handleMenu()
         elseif self.observers.input then -- Got wake up input

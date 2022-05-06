@@ -103,4 +103,17 @@ function radioManager:handleMenu()
     end
 end
 
+function radioManager:handleTS() -- trainSystem comp
+    if self.rm.runtimeData.ts then
+        local train = self.rm.runtimeData.ts.stationSys.activeTrain
+        if train and train.playerMounted then
+            for _, radio in pairs(self.radios) do
+                if radio.active then
+                    GetMountedVehicle(GetPlayer()):ToggleRadioReceiver(false)
+                end
+            end
+        end
+    end
+end
+
 return radioManager
