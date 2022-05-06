@@ -23,7 +23,10 @@ jobs:
         run: |
           cd src
           xmake
-          xcopy \packed\build\windows\x64\release\radioExt.asi \packed\bin\x64\plugins\
+          dir
+          cd \build\windows\x64\release\
+          dir
+          xcopy radioExt.asi \packed\bin\x64\plugins\
       - name: Copy files
         run: |
           xcopy init.lua \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
