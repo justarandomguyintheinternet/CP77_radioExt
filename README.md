@@ -8,7 +8,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 
 #### How it works and what it does:
 
-- This mod uses an external audio player, in the form of an `.asi` 
+- This mod uses an external audio player, in the form of an `.asi`
 - The audio player gets hooked up to the game's radio interface using a CET based mod
 - This way the custom stations look, sound and behave just like the ones already in the game
 
@@ -29,7 +29,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 5. Place any song you want inside the stations folder e.g. `radioExt\radios\myRadio`
 	-  Only `.mp3` and `.wav` is supported
 	- Try to keep the file size small (<10mb per file)
-	- File names are not allowed to contain special characters such as emojis
+	- File names are not allowed to contain special characters such as emojis, apostrophes and dots. Try to keep it as simple as possible.
 	- Keep in mind that the songs file names are being used as song names ingame, so keep them clean
 	- At least 3 songs per station are required, no upper limit
 
