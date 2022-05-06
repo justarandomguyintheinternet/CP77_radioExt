@@ -50,6 +50,13 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
     TweakDB:SetFlat("RadioStation." .. path .. ".icon", self.icon)
     CName.add(self.name)
 
+    if metadata.customIcon.useCustom then
+        TweakDB:CloneRecord("UIIcon." .. path, "UIIcon.ICEMinor")
+        TweakDB:SetFlat("UIIcon." .. path .. ".atlasResourcePath", metadata.customIcon.inkAtlasPath)
+        TweakDB:SetFlat("UIIcon." .. path .. ".atlasPartName", metadata.customIcon.inkAtlasPart)
+        TweakDB:SetFlat("RadioStation." .. path .. ".icon", "UIIcon." .. path)
+    end
+
     self:startRadioSimulation()
 end
 

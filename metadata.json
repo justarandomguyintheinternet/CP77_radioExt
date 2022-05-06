@@ -1,6 +1,11 @@
 {
     "displayName" : "69.9 Your Station Name",
     "fm" : 69.9,
-    "icon" : "UIIcon.alcohol_absynth",
+    "vanillaIcon" : "UIIcon.alcohol_absynth",
+    "customIcon": {
+        "inkAtlasPath": "",
+        "inkAtlasPart": "",
+        "useCustom": false
+    },
     "volume" : 1.0
 }

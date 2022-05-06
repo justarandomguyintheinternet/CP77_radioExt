@@ -35,6 +35,16 @@ function radioManager:loadRadios() -- Loads radios based on radios.json file, ge
             local metadata = config.loadFile("radios/" .. path .. "/metadata.json")
             local songs = config.loadFile("radios/" .. path .. "/songInfos.json")
 
+            if metadata.customIcon == nil then
+                metadata.customIcon = {
+                    ["useCustom"] = false,
+                    ["inkAtlasPath"] = "",
+                    ["inkAtlasPart"] = ""
+                }
+
+                config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+            end
+
             local r = require("modules/radio"):new(self.rm)
             r:load(metadata, songs, path)
             self.radios[#self.radios + 1] = r

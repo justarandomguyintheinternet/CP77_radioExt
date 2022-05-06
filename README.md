@@ -23,7 +23,8 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 4. Change the values inside this file to your liking:
 	- `displayName` is what gets displayed as the stations name
 	- `fm` is a number, if the `displayName` has a FM number it should be the same, which is used to place the station at the right place in the stations list
-	- `icon` is the icon for the station. It can be any `UIIcon.` record. To find a list of all records, open the CET console's `TweakDB Editor` tab, and enter `UIIcon.` in the search bar
+	- `icon` is the icon for the station. It can be any `UIIcon.` record. To find a list of all records, open the CET console's `TweakDB Editor` tab, and enter `UIIcon.` in the search bar (Make sure you have the [tweakdb.str](https://cdn-l-cyberpunk.cdprojektred.com/metadata-1.5.2.zip) file placed inside the `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks` folder)
+	- `customIcon` is used to specify a custom icon. For more information on this topic, go to the ["How to use a custom icon"](#How to use a custom icon:) section
 	- `volume` is the overall volume multiplier for the station
 
 5. Place any song you want inside the stations folder e.g. `radioExt\radios\myRadio`
@@ -45,6 +46,12 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 	```
 
 7. Launch the game
+
+## How to use a custom icon:
+	- All settings related to custom icons are inside the `customIcon` section of a stations `metadata.json` file
+	- `useCustom` if this is set to `false` the icon specified inside `icon` will be used. If set to true the custom icon will be used
+	- `inkAtlasPath` points to the `.inkatlas` that holds the icon texture. e.g. `base\\gameplay\\gui\\world\\vending_machines\\atlas_roach_race.inkatlas`
+	- `inkAtlasPart` specifies which part of the `.inkatlas` should be used for the icon. e.g. `gryphon_5`
 
 #### Credits
 - The [miniaudio](https://github.com/mackron/miniaudio) library by mackron
