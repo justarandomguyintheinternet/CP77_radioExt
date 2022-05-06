@@ -7,7 +7,7 @@ on:
 
 jobs:
   pack:
-    runs-on: ubuntu-latest
+    runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
       - uses: xmake-io/github-action-setup-xmake@master
@@ -17,18 +17,18 @@ jobs:
       - name: Setup folder
         run: |
           cd ${{ github.workspace }}
-          sudo mkdir -p /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+          mkdir \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\
       - name: Build
         run: |
           cd src
           xmake
       - name: Copy files
         run: |
-          sudo cp -r init.lua /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
-          sudo cp -r metadata.json /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
-          sudo cp -r modules /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+          xcopy init.lua \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
+          xcopy metadata.json \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
+          xcopy modules \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
       - name: Upload zip
         uses: actions/upload-artifact@v2
         with:
             name: nativeSettingsLatest
-            path: /packed/
+            path: \packed\
