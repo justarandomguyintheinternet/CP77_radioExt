@@ -24,14 +24,12 @@ jobs:
           cd src
           xmake
           dir
-          cd \packed\src\build\windows\x64\release\
-          dir
-          xcopy radioExt.asi \packed\bin\x64\plugins\
       - name: Copy files
         run: |
           xcopy init.lua \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy metadata.json \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy modules \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules /e
+          xcopy \src\build\windows\x64\release\radioExt.asi \packed\bin\x64\plugins\ /e
       - name: Upload zip
         uses: actions/upload-artifact@v2
         with:
