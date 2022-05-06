@@ -24,6 +24,7 @@ function radioManager:loadRadios() -- Loads radios based on radios.json file, ge
     end
 
     local radios = config.loadFile("radios/radiosInfo.json")
+    if not radios then return end
 
     for _, path in pairs(radios.paths) do
         if not config.fileExists("radios/" .. path .. "/metadata.json") then
