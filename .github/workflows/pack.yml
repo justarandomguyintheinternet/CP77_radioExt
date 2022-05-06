@@ -1,0 +1,34 @@
+name: pack
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: xmake-io/github-action-setup-xmake@master
+        with:
+          xmake-version: latest
+
+      - name: Setup folder
+        run: |
+          cd ${{ github.workspace }}
+          sudo mkdir -p /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+      - name: Build
+        run: |
+          cd src
+          xmake
+      - name: Copy files
+        run: |
+          sudo cp -r init.lua /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+          sudo cp -r metadata.json /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+          sudo cp -r modules /packed/bin/x64/plugins/cyber_engine_tweaks/mods/radioExt/
+      - name: Upload zip
+        uses: actions/upload-artifact@v2
+        with:
+            name: nativeSettingsLatest
+            path: /packed/
