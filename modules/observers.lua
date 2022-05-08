@@ -16,6 +16,10 @@ function observers.getStations() -- Return sorted list of all stations {fm, radi
 
     for _, v in pairs(stations) do -- Store in temp table for sorting by fm number
         local fm = GetLocalizedText(v.record:DisplayName())
+        if GetLocalizedText(v.record:DisplayName()) == "Royal Blue Radio 91.9" then -- Special handling for weird french loc
+            TweakDB:SetFlat("RadioStation.Jazz.displayName", "91.9 Royal Blue Radio")
+            fm = GetLocalizedText(v.record:DisplayName())
+        end
         sorted[#sorted + 1] = {data = v, fm = tonumber(utils.split(fm, " ")[1])}
     end
 
@@ -56,17 +60,21 @@ function observers.init(radioMod)
             table.insert(stations, v.data)
         end
 
-        local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-        if GetLocalizedTextByKey(name) ~= "" then
-            name = GetLocalizedTextByKey(name)
-        else
-            name = name.value
-        end
+        if GetMountedVehicle(GetPlayer()) then
 
-        for k, v in pairs(stations) do
-            if GetLocalizedText(v.record:DisplayName()) == name then
-                this.startupIndex = k - 1
+            local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
+            if GetLocalizedTextByKey(name) ~= "" then
+                name = GetLocalizedTextByKey(name)
+            else
+                name = name.value
             end
+
+            for k, v in pairs(stations) do
+                if GetLocalizedText(v.record:DisplayName()) == name then
+                    this.startupIndex = k - 1
+                end
+            end
+
         end
 
         this.dataSource:Reset(stations)

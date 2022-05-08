@@ -70,8 +70,10 @@ function radioManager:switchToRadio(radio)
     if radio.active then return end
     self:disableCustomRadio()
     Cron.After(0.1, function()
-        GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
-        GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, radio.name)
+        if GetMountedVehicle(GetPlayer()) then
+            GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+            GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, radio.name)
+        end
         radio:activate()
     end)
 end

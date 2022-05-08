@@ -42,7 +42,8 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
         self.icon = metadata.icon
     end
 
-    self.path = path
+    path = tostring(path .. "_custom") -- In case someone names the station the same as a vanilla one
+
     self.tdbName = "RadioStation." .. path
 
     TweakDB:CloneRecord("RadioStation." .. path, "RadioStation.Pop")

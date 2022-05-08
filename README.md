@@ -50,7 +50,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 ## How to use a custom icon:
 - All settings related to custom icons are inside the `customIcon` section of a stations `metadata.json` file
 - `useCustom` if this is set to `false` the icon specified inside `icon` will be used. If set to true the custom icon will be used
-- `inkAtlasPath` points to the `.inkatlas` that holds the icon texture, e.g. `base\\gameplay\\gui\\world\\vending_machines\\atlas_roach_race.inkatlas`
+- `inkAtlasPath` points to the `.inkatlas` that holds the icon texture, e.g. `base\\gameplay\\gui\\world\\vending_machines\\atlas_roach_race.inkatlas` (Path requires double backslashes `\\`)
 - `inkAtlasPart` specifies which part of the `.inkatlas` should be used for the icon, e.g. `gryphon_5`
 
 #### Credits
