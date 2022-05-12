@@ -15,12 +15,16 @@ function observers.getStations() -- Return sorted list of all stations {fm, radi
     local sorted = {}
 
     for _, v in pairs(stations) do -- Store in temp table for sorting by fm number
-        local fm = GetLocalizedText(v.record:DisplayName())
-        if GetLocalizedText(v.record:DisplayName()) == "Royal Blue Radio 91.9" then -- Special handling for weird french loc
-            TweakDB:SetFlat("RadioStation.Jazz.displayName", "91.9 Royal Blue Radio")
-            fm = GetLocalizedText(v.record:DisplayName())
+        local fm = string.gsub(GetLocalizedText(v.record:DisplayName()), ",", ".")
+
+        local split = utils.split(fm, " ")
+        if tonumber(split[1]) then
+            fm = tonumber(split[1])
+        else
+            fm = tonumber(split[#split])
         end
-        sorted[#sorted + 1] = {data = v, fm = tonumber(utils.split(fm, " ")[1])}
+
+        sorted[#sorted + 1] = {data = v, fm = fm}
     end
 
     for _, radio in pairs(observers.radioMod.radioManager.radios) do -- Add custom radios

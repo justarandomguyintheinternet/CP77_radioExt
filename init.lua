@@ -27,7 +27,7 @@ function radio:new()
         local result = self.radioManager:loadRadios()
 
         if not result then
-            print("[RadioMod] Could not find radios.json!")
+            print("[RadioMod] Could not find radiosInfo.json!")
         end
 
         Observe('RadialWheelController', 'OnIsInMenuChanged', function(_, isInMenu) -- Setup observer and GameUI to detect inGame / inMenu
