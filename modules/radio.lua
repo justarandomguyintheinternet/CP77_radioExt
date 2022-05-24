@@ -27,7 +27,7 @@ function radio:new(radioMod)
    	return setmetatable(o, self)
 end
 
-function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all song
+function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all songs
     for k, v in pairs(lengthData) do
         table.insert(self.songs, {path = k, length = v})
     end
@@ -85,6 +85,8 @@ function radio:startRadioSimulation()
 end
 
 function radio:activate()
+    if self.active then return end
+
     self.active = true
     audio.playFile("radios\\" .. self.currentSong.path, self.tick, self.volume)
 end

@@ -4,7 +4,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 #### How to use:
 
 - [CET](https://github.com/yamashi/CyberEngineTweaks) Version 1.18.1+ is required
-- Download and install the mod from [LINK HERE]
+- Download and install the mod from [here](https://github.com/justarandomguyintheinternet/CP77_radioExt/releases)
 
 #### How it works and what it does:
 
