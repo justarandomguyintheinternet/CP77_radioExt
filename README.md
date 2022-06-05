@@ -28,7 +28,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 	- `volume` is the overall volume multiplier for the station
 
 5. Place any song you want inside the stations folder e.g. `radioExt\radios\myRadio`
-	-  Only `.mp3` and `.wav` is supported
+	-  Only `.mp3` and `.wav` is supported (Renaming e.g. an `.ogg` file to `.mp3` does NOT work, it has to be properly encoded)
 	- Try to keep the file size small (<10mb per file)
 	- File names are not allowed to contain special characters such as emojis, apostrophes and dots. Try to keep it as simple as possible.
 	- Keep in mind that the songs file names are being used as song names ingame, so keep them clean
@@ -52,6 +52,7 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 - `useCustom` if this is set to `false` the icon specified inside `icon` will be used. If set to true the custom icon will be used
 - `inkAtlasPath` points to the `.inkatlas` that holds the icon texture, e.g. `base\\gameplay\\gui\\world\\vending_machines\\atlas_roach_race.inkatlas` (Path requires double backslashes `\\`)
 - `inkAtlasPart` specifies which part of the `.inkatlas` should be used for the icon, e.g. `gryphon_5`
+- To create your own `.inkatlas` file, use [WolvenKit](https://github.com/WolvenKit/WolvenKit)
 
 #### Credits
 - The [miniaudio](https://github.com/mackron/miniaudio) library by mackron
