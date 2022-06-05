@@ -1,4 +1,6 @@
 #include "main.h"
+#define UNICODE
+#define _UNICODE
 
 ma_result result;
 ma_engine engine;
@@ -12,10 +14,9 @@ std::atomic_bool firstInit = false;
 std::atomic_bool engineInited = false;
 
 std::mutex mutex;
-logger* Logger;
+logger* Logger; // TODO: Switch to spdlog
 std::filesystem::path rootDir;
 
-std::thread sleepThread;
 WNDCLASS wc = {0};
 HWND hWin;
 
@@ -44,10 +45,10 @@ BOOL APIENTRY DllMain( HMODULE hModule,
         }
 
         Logger = new logger("radioAdditions.log");
-        Logger->log("Started logging in root dir: " + rootDir.string());
+        Logger->log("Started logging: " + rootDir.string() + "\\plugins\\radioAdditions.log");
 
         if (!std::filesystem::exists(rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt\\init.lua")) {
-            Logger->log("[Error] CET Part not found! Expected it in \"" + (rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt").string() + "\"");
+            Logger->error("CET Part not found! Expected it in \"" + (rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt").string() + "\"");
             break;
         }
 
@@ -59,9 +60,6 @@ BOOL APIENTRY DllMain( HMODULE hModule,
             shouldRun = false;
             if (thd.joinable())
             thd.join();
-
-            if (sleepThread.joinable())
-            sleepThread.join();
         break;
     default:
         break;
@@ -132,10 +130,10 @@ static LRESULT WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
                     }
                     engineInited = false;
 
-                    Logger->log("System Power off");
+                    Logger->log("System Powered off");
                 }
                 if (wParam == PBT_APMRESUMESUSPEND  ){
-                    Logger->log("System Power on");
+                    Logger->log("System Powered on");
                 }
             }
         }
@@ -144,13 +142,13 @@ static LRESULT WINAPI WindowProc(HWND hWnd, UINT uMsg, WPARAM wParam, LPARAM lPa
     }
 
 void setupThread(){
-    for (const auto & entry : std::filesystem::directory_iterator(rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt\\io\\out")){
+    for (const auto & entry : std::filesystem::directory_iterator(rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt\\io\\out")){ // Clear the folder
         if(entry.path().extension().string() == ".json"){
             std::filesystem::remove(entry.path());
         }
     }
 
-    wc.lpfnWndProc = WindowProc;
+    wc.lpfnWndProc = WindowProc; // Fake window for power broadcasts
     wc.lpszClassName = TEXT("radioExtWindow");
     RegisterClass(&wc);
     hWin = CreateWindow(TEXT("radioExtWindow"), TEXT(""), 0, 0, 0, 0, 0, NULL, NULL, NULL, 0);
@@ -164,7 +162,7 @@ void setupThread(){
             if(!firstInit){
                 ma_engine_init(NULL, &engine);
                 firstInit = true;
-                Logger->log("maEngine inited");
+                Logger->engine("maEngine inited");
                 engineInited = true;
 
                 generateMetadata();
@@ -172,7 +170,7 @@ void setupThread(){
 
             for (const auto & entry : std::filesystem::directory_iterator(rootDir / "plugins\\cyber_engine_tweaks\\mods\\radioExt\\io\\out")){
                 if(entry.path().extension().string() == ".json"){
-                    Logger->log("Found new file, preparing to open and parse: " + entry.path().string());
+                    Logger->log("Found new audio request: " + entry.path().string());
                     handleRequest(entry.path());
                 }
             }
@@ -189,7 +187,7 @@ void handleRequest(std::filesystem::path path){
         try {
             json = nlohmann::json::parse(jFile);
         } catch(nlohmann::json::parse_error) {
-            Logger->log("[Error] Json Parsing error");
+            Logger->error("Json Parsing error");
             jFile.close();
             return;
         }
@@ -203,7 +201,7 @@ void handleRequest(std::filesystem::path path){
         }else if(json["type"].get<std::string>() == "reset"){
             handleReset();
         }else{
-            Logger->log("Unknown request type:" + json["type"].get<std::string>());
+            Logger->error("Unknown request type:" + json["type"].get<std::string>());
         }
 
         std::filesystem::remove(path);
@@ -223,7 +221,7 @@ void handleReset(){
     ma_engine_init(NULL, &engine);
     engineInited = true;
 
-    Logger->log("maEngine reset");
+    Logger->engine("maEngine reset");
 }
 
 void handleStop(){
@@ -233,7 +231,7 @@ void handleStop(){
     ma_sound_uninit(&currentSong);
     sound_active = false;
 
-    Logger->log("Stopped playing");
+    Logger->log("Stopped playing audio");
 }
 
 void handlePlay(nlohmann::json json){
