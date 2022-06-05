@@ -56,4 +56,5 @@ A mod for CP2077 that allows for the addition of custom car radio stations, by u
 
 #### Credits
 - The [miniaudio](https://github.com/mackron/miniaudio) library by mackron
+- [psiberx](https://github.com/psiberx/cp2077-cet-kit) for Cron.lua, GameUI.lua and GameSettings.lua
 - [WSS](https://github.com/WSSDude420) for letting me use some of his C++ code
