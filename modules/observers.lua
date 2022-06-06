@@ -24,6 +24,8 @@ function observers.getStations() -- Return sorted list of all stations {fm, radi
             fm = tonumber(split[#split])
         end
 
+        if GetLocalizedText(v.record:DisplayName()) == "Enable Aux Radio" then fm = 0 end
+
         sorted[#sorted + 1] = {data = v, fm = fm}
     end
 
