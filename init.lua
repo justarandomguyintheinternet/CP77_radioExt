@@ -23,6 +23,9 @@ radio = {
 
 function radio:new()
     registerForEvent("onInit", function()
+
+        math.randomseed(os.clock()) -- Prevent predictable random() behavior
+
         self.radioManager = require("modules/radioManager"):new(self)
         local result = self.radioManager:loadRadios()
 
