@@ -43,19 +43,6 @@ end
 function observers.init(radioMod)
     observers.radioMod = radioMod
 
-    Observe('PlayerPuppet', 'OnAction', function()
-        if radioMod.runtimeData.hibernate and not observers.input then -- Restart when PC was sleeping
-            observers.input = true
-            audioEnine.resetEngine()
-
-            Cron.After(0.1, function ()
-                radioMod.radioManager:handleMenu()
-                radioMod.runtimeData.hibernate = false
-                observers.input = false
-            end)
-        end
-    end)
-
     Override("VehicleRadioPopupGameController", "SetupData", function (this) -- Add stations to station list
         local sorted = observers.getStations()
         local stations = {}
