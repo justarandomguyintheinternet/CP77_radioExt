@@ -1,6 +1,5 @@
 local utils = require("modules/utils")
 local Cron = require("modules/Cron")
-local audioEnine = require("modules/audioEngine")
 
 observers = {
     radioUI = nil,
@@ -106,8 +105,10 @@ function observers.init(radioMod)
                 inkTextRef.SetText(this.radioStationName, observers.customNotif.name)
 
                 local path = observers.customNotif.path
-                path = utils.split(path, "\\")[2]
-                path = path:match("(.+)%..+$")
+                if not observers.customNotif.isStream then
+                    path = utils.split(path, "\\")[2]
+                    path = path:match("(.+)%..+$")
+                end
 
                 inkTextRef.SetText(this.subText, path)
             else
@@ -161,7 +162,7 @@ function observers.init(radioMod)
                         radioMod.radioManager:switchToRadio(nextCustom)
                         GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
                     end
-                    observers.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path}
+                    observers.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path, isStream = nextCustom.metadata.streamInfo.isStream}
                 else
                     radioMod.radioManager:disableCustomRadio()
                     this:GetVehicle():SetRadioReceiverStation(stations[next].record:Index())

@@ -36,7 +36,7 @@ function radio:new()
         end
 
         self.radioManager = require("modules/radioManager"):new(self)
-        local result = self.radioManager:loadRadios()
+        self.radioManager:loadRadios()
 
         Observe('RadialWheelController', 'OnIsInMenuChanged', function(_, isInMenu) -- Setup observer and GameUI to detect inGame / inMenu
             self.runtimeData.inMenu = isInMenu

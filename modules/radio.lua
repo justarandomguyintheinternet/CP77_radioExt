@@ -9,6 +9,7 @@ function radio:new(radioMod)
 
     o.rm = radioMod
 
+    o.metadata = nil
     o.songs = {}
     o.name = nil
     o.fm = nil
@@ -35,6 +36,7 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
     self.name = metadata.displayName
     self.fm = metadata.fm
     self.volume = metadata.volume
+    self.metadata = metadata
 
     if metadata.icon == "default" then
         self.icon = "UIIcon.RadioHipHop"
@@ -58,7 +60,11 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
         TweakDB:SetFlat("RadioStation." .. path .. ".icon", "UIIcon." .. path)
     end
 
-    self:startRadioSimulation()
+    if not self.metadata.streamInfo.isStream then
+        self:startRadioSimulation()
+    else
+        self.currentSong = {path = self.name, length = 0}
+    end
 end
 
 function radio:startRadioSimulation()
@@ -88,7 +94,11 @@ function radio:activate()
     if self.active then return end
 
     self.active = true
-    audio.playFile("radios\\" .. self.currentSong.path, self.tick, self.volume)
+    if not self.metadata.streamInfo.isStream then
+        audio.playFile("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
+    else
+        audio.playFile(self.metadata.streamInfo.streamURL, 0, self.volume)
+    end
 end
 
 function radio:deactivate()
@@ -107,7 +117,7 @@ end
 function radio:startNewSong()
     if self.active then
         Cron.After(0.05, function ()
-            audio.playFile("radios\\" .. self.currentSong.path, self.tick, self.volume)
+            audio.playFile("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
         end)
     end
 end
