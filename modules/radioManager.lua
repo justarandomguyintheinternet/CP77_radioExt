@@ -1,5 +1,5 @@
-local config = require("modules/config")
-local Cron   = require("modules/Cron")
+local config = require("modules/utils/config")
+local Cron = require("modules/utils/Cron")
 
 local radioManager = {}
 
@@ -78,7 +78,7 @@ function radioManager:loadRadios() -- Loads radios
             if success then
                 self:backwardsCompatibility(metadata)
 
-                local r = require("modules/radio"):new(self.rm)
+                local r = require("modules/radioStation"):new(self.rm)
                 r:load(metadata, songs, path)
                 self.radios[#self.radios + 1] = r
             else
@@ -114,7 +114,7 @@ function radioManager:switchToRadio(radio)
     end)
 end
 
-function radioManager:disableCustomRadio()
+function radioManager:disableCustomRadio() -- Disables all custom radios, vehicle and physical
     for _, radio in pairs(self.radios) do
         radio:deactivate()
     end

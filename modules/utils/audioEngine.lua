@@ -1,11 +1,11 @@
 local GameSettings = require("modules/GameSettings")
 
-audio = {}
+local audio = {}
 
 function audio.playFile(path, time, volume, fade)
-    fade = fade or 750
+    fade = fade or 0.75
     local carVolume = GameSettings.Get("/audio/volume/CarRadioVolume")
-    RadioExt.PlayV(path, time * 1000, volume * 0.75 * (carVolume / 100))
+    RadioExt.PlayV(path, time * 1000, volume * 0.3 * (carVolume / 100), fade)
 end
 
 function audio.stopAudio()

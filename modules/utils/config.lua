@@ -1,4 +1,4 @@
-config = {}
+local config = {}
 
 function config.fileExists(filename)
     local f=io.open(filename,"r")

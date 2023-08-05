@@ -1,13 +1,15 @@
-local utils = require("modules/utils")
-local Cron = require("modules/Cron")
+-- Observers for vehicle radio
 
-observers = {
+local utils = require("modules/utils/utils")
+local Cron = require("modules/utils/Cron")
+
+local observersV = {
     radioUI = nil,
     input = false,
     customNotif = nil
 }
 
-function observers.getStations() -- Return sorted list of all stations {fm, radioRecord}
+function observersV.getStations() -- Return sorted list of all stations {fm, radioRecord}
     local stations = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())
     stations[1] = nil -- Get rid of the NoStation
 
@@ -28,7 +30,7 @@ function observers.getStations() -- Return sorted list of all stations {fm, radi
         sorted[#sorted + 1] = {data = v, fm = fm}
     end
 
-    for _, radio in pairs(observers.radioMod.radioManager.radios) do -- Add custom radios
+    for _, radio in pairs(observersV.radioMod.radioManager.radios) do -- Add custom radios
         sorted[#sorted + 1] = {data = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord(radio.tdbName)}), fm = tonumber(radio.fm)}
     end
 
@@ -39,11 +41,69 @@ function observers.getStations() -- Return sorted list of all stations {fm, radi
     return sorted
 end
 
-function observers.init(radioMod)
-    observers.radioMod = radioMod
+function observersV.initRadioP(radioMod) -- Physical radio observersV
+    Override("RadioControllerPS", "InitializeRadioStations", function (this, wrapped)
+        if this.stationsInitialized then return end
+        wrapped()
+
+        local stations = this.stations
+
+        for _, radio in pairs(radioMod.radioManager.radios) do
+            local map = RadioStationsMap.new()
+            map.channelName = radio.name -- Name
+            map.stationID = ERadioStationList.NONE
+            table.insert(stations, map)
+        end
+
+        this.stations = stations
+    end)
+
+    Observe("Radio", "PlayGivenStation", function (this)
+        local map = this:GetDevicePS():GetStationByIndex(this:GetDevicePS():GetActiveStationIndex())
+        local radio = radioMod.radioManager:getRadioByName(map.channelName)
+
+        if radio then
+            -- Stop playback
+            -- check if radioObject exists with this handle
+            -- Change playpack of the one with this handle to the new station
+            -- Create new object with this handle and start playback
+        else
+            -- Check if radio with this handle existst
+            -- If yes then remove object
+        end
+    end)
+
+    Override("RadioInkGameController", "SetupStationLogo", function (this, wrapped)
+        local PS = this:GetOwner():GetDevicePS()
+        local map = PS:GetStationByIndex(PS:GetActiveStationIndex())
+        local radio = radioMod.radioManager:getRadioByName(map.channelName)
+        if radio then
+            local iconRecord = TweakDBInterface.GetUIIconRecord(radio.icon)
+            inkImageRef.SetAtlasResource(this.stationLogoWidget, iconRecord:AtlasResourcePath())
+            inkImageRef.SetTexturePart(this.stationLogoWidget, iconRecord:AtlasPartName())
+        else
+            inkImageRef.SetAtlasResource(this.stationLogoWidget, ResRef.FromName("base\\gameplay\\gui\\common\\icons\\radiostations_icons.inkatlas"))
+            wrapped()
+        end
+    end)
+
+    ObserveAfter("RadioInkGameController", "TurnOn", function (this)
+        local PS = this:GetOwner():GetDevicePS()
+        local map = PS:GetStationByIndex(PS:GetActiveStationIndex())
+        local radio = radioMod.radioManager:getRadioByName(map.channelName)
+        if radio then
+            inkTextRef.SetText(this.stationNameWidget, radio.name)
+        end
+    end)
+end
+
+function observersV.init(radioMod)
+    observersV.radioMod = radioMod
+
+    observersV.initRadioP(radioMod)
 
     Override("VehicleRadioPopupGameController", "SetupData", function (this) -- Add stations to station list
-        local sorted = observers.getStations()
+        local sorted = observersV.getStations()
         local stations = {}
 
         stations[1] = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord("RadioStation.NoStation")}) -- Add NoStation
@@ -101,11 +161,11 @@ function observers.init(radioMod)
             inkWidgetRef.SetVisible(this.subText, true)
             inkWidgetRef.SetVisible(this.radioStationName, true)
 
-            if observers.customNotif then
-                inkTextRef.SetText(this.radioStationName, observers.customNotif.name)
+            if observersV.customNotif then
+                inkTextRef.SetText(this.radioStationName, observersV.customNotif.name)
 
-                local path = observers.customNotif.path
-                if not observers.customNotif.isStream then
+                local path = observersV.customNotif.path
+                if not observersV.customNotif.isStream then
                     path = utils.split(path, "\\")[2]
                     path = path:match("(.+)%..+$")
                 end
@@ -117,7 +177,7 @@ function observers.init(radioMod)
             end
         end
 
-        observers.customNotif = nil
+        observersV.customNotif = nil
     end)
 
     Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped) -- Handle radio shortcut press
@@ -140,7 +200,7 @@ function observers.init(radioMod)
                 this.vehicleBlackboard:SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, this:GetVehicle():GetRadioReceiverStationName())
                 Game.GetUISystem():QueueEvent(uiRadioEvent)
             else
-                local sorted = observers.getStations()
+                local sorted = observersV.getStations()
                 local stations = {}
                 for _, v in pairs(sorted) do -- Get rid of nested table structure
                     table.insert(stations, v.data)
@@ -162,7 +222,7 @@ function observers.init(radioMod)
                         radioMod.radioManager:switchToRadio(nextCustom)
                         GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
                     end
-                    observers.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path, isStream = nextCustom.metadata.streamInfo.isStream}
+                    observersV.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path, isStream = nextCustom.metadata.streamInfo.isStream}
                 else
                     radioMod.radioManager:disableCustomRadio()
                     this:GetVehicle():SetRadioReceiverStation(stations[next].record:Index())
@@ -177,4 +237,4 @@ function observers.init(radioMod)
     end)
 end
 
-return observers
+return observersV

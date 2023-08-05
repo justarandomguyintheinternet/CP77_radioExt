@@ -1,6 +1,6 @@
-local Cron = require("modules/Cron")
-local utils = require("modules/utils")
-local audio = require("modules/audioEngine")
+local Cron = require("modules/utils/Cron")
+local utils = require("modules/utils/utils")
+local audio = require("modules/utils/audioEngine")
 
 radio = {}
 
@@ -58,6 +58,7 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
         TweakDB:SetFlat("UIIcon." .. path .. ".atlasResourcePath", metadata.customIcon.inkAtlasPath)
         TweakDB:SetFlat("UIIcon." .. path .. ".atlasPartName", metadata.customIcon.inkAtlasPart)
         TweakDB:SetFlat("RadioStation." .. path .. ".icon", "UIIcon." .. path)
+        self.icon = "UIIcon." .. path
     end
 
     if not self.metadata.streamInfo.isStream then

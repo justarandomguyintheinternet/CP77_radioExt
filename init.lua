@@ -16,10 +16,11 @@ radio = {
         time = nil,
         ts = nil
     },
-    GameUI = require("modules/GameUI"),
-    config = require("modules/config"),
-    Cron = require("modules/Cron"),
-    observers = require("modules/observers")
+    GameUI = require("modules/utils/GameUI"),
+    config = require("modules/utils/config"),
+    Cron = require("modules/utils/Cron"),
+    observersV = require("modules/vehicle/observersV"),
+    observersP = require("modules/physical/observersP")
 }
 
 function radio:new()
@@ -51,7 +52,8 @@ function radio:new()
             self.radioManager:disableCustomRadio()
         end)
 
-        self.observers.init(self)
+        self.observersV.init(self)
+        self.observersP.init(self)
         self.runtimeData.ts = GetMod("trainSystem")
 
         self.runtimeData.inGame = not self.GameUI.IsDetached() -- Required to check if ingame after reloading all mods
