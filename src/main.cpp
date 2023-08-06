@@ -1,11 +1,12 @@
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/RTTITypes.hpp>
 #include <RED4ext/Scripting/IScriptable.hpp>
+#include <RED4ext/Scripting/Natives/Generated/Vector4.hpp>
 #include <fmod.hpp>
 #include <fmod_errors.h>
 
 #define RADIOEXT_VERSION 0.1
-#define CHANNELS 32
+#define CHANNELS 64
 
 const RED4ext::Sdk* sdk;
 RED4ext::PluginHandle handle;
@@ -22,10 +23,12 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
 void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 
 // Red4Ext Stuff
 void registerGeneralFunctions(RED4ext::CRTTISystem* rtti);
-void registerVehicleRadioFunctions(RED4ext::CRTTISystem* rtti);
+void registerAudioFunctions(RED4ext::CRTTISystem* rtti);
 
 // Native Class setup
 struct RadioExt : RED4ext::IScriptable
@@ -55,10 +58,10 @@ RED4EXT_C_EXPORT void RED4EXT_CALL PostRegisterTypes()
     cls.parent = scriptable;
 
     registerGeneralFunctions(rtti);
-    registerVehicleRadioFunctions(rtti);
+    registerAudioFunctions(rtti);
 }
 
-void logError(FMOD_RESULT result, std::string msg)
+void logError(FMOD_RESULT result, const char* msg)
 {
     if (result != FMOD_OK)
     {
@@ -88,7 +91,7 @@ void registerGeneralFunctions(RED4ext::CRTTISystem* rtti)
     cls.RegisterFunction(getChannels);
 }
 
-void registerVehicleRadioFunctions(RED4ext::CRTTISystem* rtti)
+void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
 {
     auto play = RED4ext::CClassStaticFunction::Create(&cls, "Play", "Play", &Play, {.isNative = true, .isStatic = true});
     play->AddParam("Int32", "channelID");
@@ -104,9 +107,20 @@ void registerVehicleRadioFunctions(RED4ext::CRTTISystem* rtti)
     auto stop = RED4ext::CClassStaticFunction::Create(&cls, "Stop", "Stop", &Stop, {.isNative = true, .isStatic = true});
     stop->AddParam("Int32", "channelID");
 
+    auto setListener = RED4ext::CClassStaticFunction::Create(&cls, "SetListener", "SetListener", &SetListenerTransform, { .isNative = true, .isStatic = true });
+    setListener->AddParam("Vector4", "pos");
+    setListener->AddParam("Vector4", "forward");
+    setListener->AddParam("Vector4", "up");
+
+    auto setChannelPos = RED4ext::CClassStaticFunction::Create(&cls, "SetChannelPos", "SetChannelPos", &SetChannelTransform, { .isNative = true, .isStatic = true });
+    setChannelPos->AddParam("Int32", "channelID");
+    setChannelPos->AddParam("Vector4", "pos");
+
     cls.RegisterFunction(play);
     cls.RegisterFunction(setVolume);
     cls.RegisterFunction(stop);
+    cls.RegisterFunction(setListener);
+    cls.RegisterFunction(setChannelPos);
 }
 
 void setFadeIn(FMOD::System* pSystem, FMOD::Channel* pChannel, float duration) {
@@ -237,7 +251,7 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &startPos);
     RED4ext::GetParameter(aFrame, &volume);
     RED4ext::GetParameter(aFrame, &fade);
-    sdk->logger->InfoF(handle, "Play(\"%s\", %i, %f, %f)", path.c_str(), startPos, volume, fade);
+    sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
     FMOD::Sound* sound;
     sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), FMOD_3D, nullptr, &sound)));
@@ -272,7 +286,7 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
     float volume;
     RED4ext::GetParameter(aFrame, &channelID);
     RED4ext::GetParameter(aFrame, &volume);
-    sdk->logger->InfoF(handle, "SetVolume(%f)", volume);
+    sdk->logger->InfoF(handle, "SetVolume(%i, %f)", channelID, volume);
 
     volume = max(0, volume);
     channelID = min(CHANNELS, channelID);
@@ -310,8 +324,92 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     {
         pChannels[channelID]->stop();
         pChannels[channelID] = nullptr;
-        sdk->logger->Info(handle, "Stopped vehicle radio");
+        sdk->logger->InfoF(handle, "Stopped channel %i", channelID);
     }
+
+    aFrame->code++; // skip ParamEnd
+}
+
+void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    int32_t channelID;
+    RED4ext::Vector4 pos;
+    RED4ext::GetParameter(aFrame, &channelID);
+    RED4ext::GetParameter(aFrame, &pos);
+
+    channelID = min(CHANNELS, channelID);
+
+    if (channelID == -1)
+    {
+        channelID = 0;
+    }
+
+    //RadioExt.SetListener(Vector4.new(0,0,0,0),Vector4.new(0,0,0,0),Vector4.new(0,0,0,0))
+    FMOD_VECTOR posF;
+
+    auto rtti = RED4ext::CRTTISystem::Get();
+    auto v4Prop = rtti->GetClass("Vector4");
+
+    auto xProp = v4Prop->GetProperty("X");
+    auto yProp = v4Prop->GetProperty("Y");
+    auto zProp = v4Prop->GetProperty("Z");
+
+    posF.x = -xProp->GetValue<float>(&pos);
+    posF.y = zProp->GetValue<float>(&pos);
+    posF.z = yProp->GetValue<float>(&pos);
+
+    if (pChannels[channelID])
+    {
+        FMOD_RESULT res = pChannels[channelID]->set3DAttributes(&posF, nullptr);
+        logError(res, "set3DListenerAttributes");
+
+    }
+
+    aFrame->code++; // skip ParamEnd
+}
+
+void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    RED4ext::Vector4 pos;
+    RED4ext::Vector4 forward;
+    RED4ext::Vector4 up;
+    RED4ext::GetParameter(aFrame, &pos);
+    RED4ext::GetParameter(aFrame, &forward);
+    RED4ext::GetParameter(aFrame, &up);
+    //RadioExt.SetListener(Vector4.new(0,0,0,0),Vector4.new(0,0,0,0),Vector4.new(0,0,0,0))
+    FMOD_VECTOR posF;
+    FMOD_VECTOR forwardF;
+    FMOD_VECTOR upF;
+    FMOD_VECTOR velF;
+    velF.x = velF.y = velF.z = 0;
+
+    auto rtti = RED4ext::CRTTISystem::Get();
+    auto v4Prop = rtti->GetClass("Vector4");
+
+    auto xProp = v4Prop->GetProperty("X");
+    auto yProp = v4Prop->GetProperty("Y");
+    auto zProp = v4Prop->GetProperty("Z");
+
+    posF.x = -xProp->GetValue<float>(&pos);
+    posF.y = zProp->GetValue<float>(&pos);
+    posF.z = yProp->GetValue<float>(&pos);
+
+    forwardF.x = -xProp->GetValue<float>(&forward);
+    forwardF.y = zProp->GetValue<float>(&forward);
+    forwardF.z = yProp->GetValue<float>(&forward);
+
+    upF.x = -xProp->GetValue<float>(&up);
+    upF.y = zProp->GetValue<float>(&up);
+    upF.z = yProp->GetValue<float>(&up);
+
+    FMOD_RESULT res = pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF);
+    logError(res, "set3DListenerAttributes");
 
     aFrame->code++; // skip ParamEnd
 }
@@ -350,7 +448,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
         handle = aHandle;
 
         sdk->logger->InfoF(handle, "FMOD::System_Create %s", FMOD_ErrorString(FMOD::System_Create(&pSystem)));
-        sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(32, FMOD_INIT_NORMAL, nullptr)));
+        sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(CHANNELS, FMOD_INIT_3D_RIGHTHANDED, nullptr)));
 
         RED4ext::GameState updateState;
         updateState.OnEnter = &Running_OnEnter;

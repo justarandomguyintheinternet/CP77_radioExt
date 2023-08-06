@@ -24,14 +24,33 @@ function observersP.init(radioMod)
         local radio = radioMod.radioManager:getRadioByName(map.channelName)
 
         if radio then
-            -- Stop playback
-            -- check if radioObject exists with this handle
-            -- Change playpack of the one with this handle to the new station
-            -- Create new object with this handle and start playback
+            GameObject.AudioSwitch(this, "radio_station", "station_none", "radio")
+
+            local object = radioMod.radioManager.managerP:getObjectByHandle(this)
+            if object then
+                object:switchToRadio(radio)
+            else
+                radioMod.radioManager.managerP:createObject(this, radio)
+            end
         else
-            -- Check if radio with this handle existst
-            -- If yes then remove object
+            radioMod.radioManager.managerP:removeObjectByHandle(this)
         end
+    end)
+
+    Observe("Radio", "TurnOffDevice", function (this)
+        radioMod.radioManager.managerP:removeObjectByHandle(this)
+    end)
+
+    Observe("Radio", "CutPower", function (this)
+        radioMod.radioManager.managerP:removeObjectByHandle(this)
+    end)
+
+    Observe("Radio", "DeactivateDevice", function (this)
+        radioMod.radioManager.managerP:removeObjectByHandle(this)
+    end)
+
+    ObserveBefore("Radio", "OnDetach", function (this)
+        radioMod.radioManager.managerP:removeObjectByHandle(this)
     end)
 
     Override("RadioInkGameController", "SetupStationLogo", function (this, wrapped)

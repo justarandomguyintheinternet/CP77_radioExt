@@ -69,7 +69,7 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
         self.currentSong = {path = self.name, length = 0}
     end
 
-    for i = -1, 31 do
+    for i = -1, RadioExt.GetNumChannels() do -- -1 is vehicle radio, 1 - CHANNELS is physical channels
         self.channels[i] = false
     end
 end

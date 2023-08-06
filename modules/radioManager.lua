@@ -62,6 +62,7 @@ end
 function radioManager:init()
     self:loadRadios()
     self.managerP = require("modules/physical/radioManagerP"):new(self)
+    self.managerP:init()
     self.managerV = require("modules/vehicle/radioManagerV"):new(self, self.rm)
 end
 
@@ -113,10 +114,12 @@ end
 
 function radioManager:update()
     self.managerV:update()
+    self.managerP:update()
 end
 
 function radioManager:handleMenu()
     self.managerV:handleMenu()
+    self.managerP:handleMenu()
 end
 
 return radioManager
