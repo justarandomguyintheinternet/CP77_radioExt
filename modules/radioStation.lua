@@ -24,6 +24,8 @@ function radio:new(radioMod)
     o.shuffelBag = nil
     o.currentSong = nil
 
+    o.channels = {}
+
 	self.__index = self
    	return setmetatable(o, self)
 end
@@ -66,6 +68,10 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
     else
         self.currentSong = {path = self.name, length = 0}
     end
+
+    for i = -1, 31 do
+        self.channels[i] = false
+    end
 end
 
 function radio:startRadioSimulation()
@@ -91,35 +97,39 @@ function radio:startRadioSimulation()
     end)
 end
 
-function radio:activate()
-    if self.active then return end
+function radio:activate(channel)
+    if self.channels[channel] then return end
 
-    self.active = true
+    self.channels[channel] = true
     if not self.metadata.streamInfo.isStream then
-        audio.playFile("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
+        audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
     else
-        audio.playFile(self.metadata.streamInfo.streamURL, 0, self.volume)
+        audio.playFile(channel, self.metadata.streamInfo.streamURL, 0, self.volume)
     end
 end
 
-function radio:deactivate()
-    if not self.active then return end
+function radio:deactivate(channel)
+    if not self.channels[channel] then return end
 
-    self.active = false
-    audio.stopAudio()
+    self.channels[channel] = false
+    audio.stopAudio(channel)
 end
 
 function radio:currentSongDone()
-    if self.active then
-        audio.stopAudio()
+    for id, state in pairs(self.channels) do
+        if state then
+            audio.stopAudio(id)
+        end
     end
 end
 
 function radio:startNewSong()
-    if self.active then
-        Cron.After(0.05, function ()
-            audio.playFile("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
-        end)
+    for id, state in pairs(self.channels) do
+        if state then
+            Cron.After(0.05, function ()
+                audio.playFile(id, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
+            end)
+        end
     end
 end
 

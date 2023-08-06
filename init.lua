@@ -37,7 +37,7 @@ function radio:new()
         end
 
         self.radioManager = require("modules/radioManager"):new(self)
-        self.radioManager:loadRadios()
+        self.radioManager:init()
 
         Observe('RadialWheelController', 'OnIsInMenuChanged', function(_, isInMenu) -- Setup observer and GameUI to detect inGame / inMenu
             self.runtimeData.inMenu = isInMenu
@@ -49,7 +49,7 @@ function radio:new()
 
         self.GameUI.OnSessionEnd(function()
             self.runtimeData.inGame = false
-            self.radioManager:disableCustomRadio()
+            self.radioManager:disableCustomRadios()
         end)
 
         self.observersV.init(self)
@@ -60,14 +60,14 @@ function radio:new()
     end)
 
     registerForEvent("onShutdown", function()
-        self.radioManager:disableCustomRadio()
+        self.radioManager:disableCustomRadios()
     end)
 
     registerForEvent("onUpdate", function(delta)
         if (not self.runtimeData.inMenu) and self.runtimeData.inGame then
             self.Cron.Update(delta)
             self.radioManager:update()
-            self.radioManager:handleTS()
+            self.radioManager.managerV:handleTS()
         else
             self.radioManager:handleMenu()
         end

@@ -141,16 +141,16 @@ function observersV.init(radioMod)
         end
 
         if radio then
-            radioMod.radioManager:switchToRadio(radio)
+            radioMod.radioManager.managerV:switchToRadio(radio)
             this.quickSlotsManager:SendRadioEvent(false, false, -1)
         else
-            radioMod.radioManager:disableCustomRadio()
+            radioMod.radioManager.managerV:disableCustomRadio()
         end
     end)
 
     Observe("ExitingEvents", "OnEnter", function () -- Normal car exiting
         Cron.After(0.5, function ()
-            radioMod.radioManager:disableCustomRadio()
+            radioMod.radioManager.managerV:disableCustomRadio()
         end)
     end)
 
@@ -217,14 +217,14 @@ function observersV.init(radioMod)
                 local nextCustom = radioMod.radioManager:getRadioByName(GetLocalizedText(stations[next].record:DisplayName()))
                 if nextCustom then -- Next station is custom
                     if cRadio then -- Previous was also custom
-                        radioMod.radioManager:switchToRadio(nextCustom)
+                        radioMod.radioManager.managerV:switchToRadio(nextCustom)
                     else
-                        radioMod.radioManager:switchToRadio(nextCustom)
+                        radioMod.radioManager.managerV:switchToRadio(nextCustom)
                         GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
                     end
                     observersV.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path, isStream = nextCustom.metadata.streamInfo.isStream}
                 else
-                    radioMod.radioManager:disableCustomRadio()
+                    radioMod.radioManager.managerV:disableCustomRadio()
                     this:GetVehicle():SetRadioReceiverStation(stations[next].record:Index())
                 end
 

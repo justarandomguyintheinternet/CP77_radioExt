@@ -2,7 +2,7 @@
 
 local observersP = {}
 
-function observersV.init(radioMod)
+function observersP.init(radioMod)
     Override("RadioControllerPS", "InitializeRadioStations", function (this, wrapped)
         if this.stationsInitialized then return end
         wrapped()
@@ -58,4 +58,4 @@ function observersV.init(radioMod)
     end)
 end
 
-return observersV
+return observersP

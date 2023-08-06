@@ -8,9 +8,9 @@ function radioManager:new(radioMod)
 
     o.rm = radioMod
     o.radios = {}
-    o.initialized = false
 
-    o.isMounted = false
+    o.managerV = nil
+    o.managerP = nil
 
 	self.__index = self
    	return setmetatable(o, self)
@@ -59,9 +59,13 @@ function radioManager:backwardsCompatibility(metadata)
     end
 end
 
-function radioManager:loadRadios() -- Loads radios
-    self.initialized = false
+function radioManager:init()
+    self:loadRadios()
+    self.managerP = require("modules/physical/radioManagerP"):new(self)
+    self.managerV = require("modules/vehicle/radioManagerV"):new(self, self.rm)
+end
 
+function radioManager:loadRadios() -- Loads radios
     local radios = RadioExt.GetFolders("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios")
     if not radios then return end
 
@@ -87,8 +91,6 @@ function radioManager:loadRadios() -- Loads radios
         end
     end
 
-    self.initialized = true
-
     return true
 end
 
@@ -102,68 +104,19 @@ function radioManager:getRadioByName(name)
     return nil
 end
 
-function radioManager:switchToRadio(radio)
-    if radio.active then return end
-    self:disableCustomRadio()
-    Cron.After(0.1, function()
-        if GetMountedVehicle(GetPlayer()) then
-            GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
-            GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, radio.name)
-        end
-        radio:activate()
-    end)
-end
-
-function radioManager:disableCustomRadio() -- Disables all custom radios, vehicle and physical
+function radioManager:disableCustomRadios() -- Disables all custom radios, vehicle and physical
     for _, radio in pairs(self.radios) do
-        radio:deactivate()
+        radio:deactivate(-1)
     end
+    self.managerP:uninit()
 end
 
 function radioManager:update()
-    local veh = GetMountedVehicle(GetPlayer())
-    if veh then
-        self.isMounted = true
-        if veh:IsEngineTurnedOn() then
-            local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-            local radio = self:getRadioByName(name.value)
-
-            if radio and not radio.active then
-                radio:activate()
-            end
-        end
-    elseif self.isMounted then
-        self.isMounted = false
-        self:disableCustomRadio()
-    end
+    self.managerV:update()
 end
 
 function radioManager:handleMenu()
-    local veh = GetMountedVehicle(GetPlayer())
-    if not veh then return end
-
-    local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-    local radio = self:getRadioByName(name.value)
-
-    if radio then
-        if radio.active then
-            radio:deactivate()
-        end
-    end
-end
-
-function radioManager:handleTS() -- trainSystem comp
-    if self.rm.runtimeData.ts then
-        if not self.rm.runtimeData.ts.stationSys then return end
-        local train = self.rm.runtimeData.ts.stationSys.activeTrain
-        if train and train.playerMounted then
-            for _, radio in pairs(self.radios) do
-                if radio.active then
-                    GetMountedVehicle(GetPlayer()):ToggleRadioReceiver(false)
-                end
-            end
-        end
-    end
+    self.managerV:handleMenu()
 end
 
 return radioManager
