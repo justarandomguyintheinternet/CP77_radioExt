@@ -7,13 +7,14 @@ function managerP:new(manager)
 
     o.manager = manager
     o.radioObjects = {}
+	o.cameraTransform = nil
 
 	self.__index = self
    	return setmetatable(o, self)
 end
 
 function managerP:init()
-
+	self.cameraTransform = Transform.new()
 end
 
 function managerP:uninit()
@@ -38,7 +39,6 @@ function managerP:createObject(handle, station)
 		if self.radioObjects[i] == nil then
 			obj:init(station, i, handle)
 			self.radioObjects[i] = obj
-			print("create", i)
 			return
 		end
 	end
@@ -52,7 +52,6 @@ function managerP:removeObjectByHandle(handle)
 	if object then
 		object:uninit()
 		self.radioObjects[object.channelID] = nil
-		print("remove", object.channelID)
 	end
 end
 
@@ -61,7 +60,9 @@ function managerP:update()
 		object.radio:activate(object.channelID)
 		object:update()
 	end
-	RadioExt.SetListener(GetPlayer():GetWorldPosition(), GetPlayer():GetWorldForward(), GetPlayer():GetWorldUp())
+
+	Game.GetCameraSystem():GetActiveCameraWorldTransform(self.cameraTransform)
+	RadioExt.SetListener(self.cameraTransform.position, GetPlayer():GetWorldForward(), GetPlayer():GetWorldUp())
 end
 
 function managerP:handleMenu()

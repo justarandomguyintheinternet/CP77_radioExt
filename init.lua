@@ -80,4 +80,3 @@ return radio:new()
 
 -- Pause while in loading screen
 -- orders
--- radio destruction ?

@@ -25,6 +25,7 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 
 // Red4Ext Stuff
 void registerGeneralFunctions(RED4ext::CRTTISystem* rtti);
@@ -104,6 +105,9 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     setVolume->AddParam("Int32", "channelID");
     setVolume->AddParam("Float", "volume");
 
+    auto setFalloff = RED4ext::CClassStaticFunction::Create(&cls, "Set3DFalloff", "Set3DFalloff", &Set3DFalloff, { .isNative = true, .isStatic = true });
+    setFalloff->AddParam("Float", "falloff");
+
     auto stop = RED4ext::CClassStaticFunction::Create(&cls, "Stop", "Stop", &Stop, {.isNative = true, .isStatic = true});
     stop->AddParam("Int32", "channelID");
 
@@ -118,6 +122,7 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
 
     cls.RegisterFunction(play);
     cls.RegisterFunction(setVolume);
+    cls.RegisterFunction(setFalloff);
     cls.RegisterFunction(stop);
     cls.RegisterFunction(setListener);
     cls.RegisterFunction(setChannelPos);
@@ -254,7 +259,13 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
     FMOD::Sound* sound;
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), FMOD_3D, nullptr, &sound)));
+    FMOD_MODE mode = FMOD_3D;
+    if (channelID == -1)
+    {
+        mode = FMOD_DEFAULT;
+    }
+
+    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), mode, nullptr, &sound)));
 
     unsigned int lengthMs = 0;
     sound->getLength(&lengthMs, FMOD_TIMEUNIT_MS);
@@ -304,6 +315,20 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
     aFrame->code++; // skip ParamEnd
 }
 
+void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    float falloff;
+    RED4ext::GetParameter(aFrame, &falloff);
+    sdk->logger->InfoF(handle, "Set3DFalloff(%f)", falloff);
+
+    sdk->logger->InfoF(handle, "FMOD::System::set3DSettings: %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, falloff)));
+
+    aFrame->code++; // skip ParamEnd
+}
+
 void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
@@ -347,7 +372,6 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
         channelID = 0;
     }
 
-    //RadioExt.SetListener(Vector4.new(0,0,0,0),Vector4.new(0,0,0,0),Vector4.new(0,0,0,0))
     FMOD_VECTOR posF;
 
     auto rtti = RED4ext::CRTTISystem::Get();
@@ -382,7 +406,7 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
     RED4ext::GetParameter(aFrame, &pos);
     RED4ext::GetParameter(aFrame, &forward);
     RED4ext::GetParameter(aFrame, &up);
-    //RadioExt.SetListener(Vector4.new(0,0,0,0),Vector4.new(0,0,0,0),Vector4.new(0,0,0,0))
+
     FMOD_VECTOR posF;
     FMOD_VECTOR forwardF;
     FMOD_VECTOR upF;
@@ -449,6 +473,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
 
         sdk->logger->InfoF(handle, "FMOD::System_Create %s", FMOD_ErrorString(FMOD::System_Create(&pSystem)));
         sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(CHANNELS, FMOD_INIT_3D_RIGHTHANDED, nullptr)));
+        sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.35)));
 
         RED4ext::GameState updateState;
         updateState.OnEnter = &Running_OnEnter;
