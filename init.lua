@@ -20,7 +20,8 @@ radio = {
     config = require("modules/utils/config"),
     Cron = require("modules/utils/Cron"),
     observersV = require("modules/vehicle/observersV"),
-    observersP = require("modules/physical/observersP")
+    observersP = require("modules/physical/observersP"),
+    version = 2.0
 }
 
 function radio:new()
@@ -77,6 +78,3 @@ function radio:new()
 end
 
 return radio:new()
-
--- Pause while in loading screen
--- orders

@@ -10,6 +10,7 @@ function radio:new(radioMod)
     o.rm = radioMod
 
     o.metadata = nil
+    o.path = ""
     o.songs = {}
     o.name = nil
     o.fm = nil
@@ -23,6 +24,7 @@ function radio:new(radioMod)
     o.active = false
     o.shuffelBag = nil
     o.currentSong = nil
+    o.orderedSongs = {}
 
     o.channels = {}
 
@@ -30,16 +32,28 @@ function radio:new(radioMod)
    	return setmetatable(o, self)
 end
 
-function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all songs
-    for k, v in pairs(lengthData) do
-        table.insert(self.songs, {path = k, length = v})
+function radio:getSongByPath(tab, path)
+    for _, song in pairs(tab) do
+        if song.path == path then return song end
+    end
+end
+
+function radio:verifyOrder() -- Verify all the songs for the order exist
+    local ordered = {}
+
+    for _, song in pairs(self.metadata.order) do
+        local songTable = self:getSongByPath(self.songs, self.path .. "\\" .. song)
+        if songTable == nil then
+            print("[RadioExt] Warning: The file \"" .. song .. "\" requested for the ordering of station \"" .. self.name .. "\" was not found.")
+        else
+            table.insert(ordered, songTable)
+        end
     end
 
-    self.name = metadata.displayName
-    self.fm = metadata.fm
-    self.volume = metadata.volume
-    self.metadata = metadata
+    self.orderedSongs = ordered
+end
 
+function radio:setupRecord(metadata, path)
     if metadata.icon == "default" then
         self.icon = "UIIcon.RadioHipHop"
     else
@@ -62,11 +76,32 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
         TweakDB:SetFlat("RadioStation." .. path .. ".icon", "UIIcon." .. path)
         self.icon = "UIIcon." .. path
     end
+end
+
+function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all songs
+    for k, v in pairs(lengthData) do
+        table.insert(self.songs, {path = k, length = v})
+    end
+
+    self.name = metadata.displayName
+    self.fm = metadata.fm
+    self.volume = metadata.volume
+    self.metadata = metadata
+    self.path = path
+
+    self:setupRecord(metadata, path)
+    self:verifyOrder()
+
+    if #self.songs == 0 and not self.metadata.streamInfo.isStream then -- Fallback for regular stations w/o any songs
+        print("[RadioExt] Error: Station \"" .. self.name .. "\" is not a stream, but also has no song files. Using fallback webstream instead.")
+        self.metadata.streamInfo.isStream = true
+        self.metadata.streamInfo.streamURL = "https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3"
+    end
 
     if not self.metadata.streamInfo.isStream then
         self:startRadioSimulation()
     else
-        self.currentSong = {path = self.name, length = 0}
+        self.currentSong = {path = self.name, length = 0} -- Used for the "playing now" HUD element
     end
 
     for i = -1, RadioExt.GetNumChannels() do -- -1 is vehicle radio, 1 - CHANNELS is physical channels
@@ -83,10 +118,10 @@ function radio:startRadioSimulation()
     self.simCron = Cron.Every(1, function ()
         if self.tick >= self.currentSong.length then
             self:currentSongDone()
+            if #self.shuffelBag == 0 then self:generateShuffelBag() end
 
             self.currentSong = self.shuffelBag[1]
             table.remove(self.shuffelBag, 1)
-            if #self.shuffelBag == 0 then self:generateShuffelBag() end
 
             self:startNewSong()
 
@@ -135,13 +170,10 @@ end
 
 function radio:generateShuffelBag()
     self.shuffelBag = {}
-    local bag
+    local bag = utils.deepcopy(self.songs)
 
-    if not self.currentSong then
-        bag = utils.deepcopy(self.songs)
-    else
-        bag = utils.deepcopy(self.songs)
-        utils.removeItem(bag, self.currentSong)
+    for _, song in pairs(self.orderedSongs) do
+        utils.removeItem(bag, self:getSongByPath(bag, song.path))
     end
 
     while #bag > 0 do
@@ -150,8 +182,9 @@ function radio:generateShuffelBag()
         utils.removeItem(bag, i)
     end
 
-    if self.currentSong then
-        table.insert(self.shuffelBag, self.currentSong)
+    local insertionIndex = math.random(#self.shuffelBag + 1) -- Insert ordered part somewhere
+    for i = #self.orderedSongs, 1, -1 do
+        table.insert(self.shuffelBag, insertionIndex, self.orderedSongs[i])
     end
 end
 

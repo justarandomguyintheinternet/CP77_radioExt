@@ -32,7 +32,7 @@ function radioManager:getSongLengths(radioName)
     return songs
 end
 
-function radioManager:backwardsCompatibility(metadata)
+function radioManager:backwardsCompatibility(metadata, path)
     if metadata.customIcon == nil then
         metadata.customIcon = {
             ["useCustom"] = false,
@@ -81,7 +81,7 @@ function radioManager:loadRadios() -- Loads radios
             end)
 
             if success then
-                self:backwardsCompatibility(metadata)
+                self:backwardsCompatibility(metadata, path)
 
                 local r = require("modules/radioStation"):new(self.rm)
                 r:load(metadata, songs, path)
