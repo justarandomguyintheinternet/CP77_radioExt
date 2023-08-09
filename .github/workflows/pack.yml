@@ -2,7 +2,9 @@ name: pack
 
 on:
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - fmod
   workflow_dispatch:
 
 jobs:
@@ -20,19 +22,15 @@ jobs:
           mkdir \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\
           mkdir \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules
           mkdir \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios
-          mkdir \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\io\out
-      - name: Build
-        run: |
-          cd src
-          xmake
+          mkdir \packed\red4ext\plugins\RadioExt
       - name: Copy files
         run: |
           xcopy init.lua \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy metadata.json \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy modules \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules /e
           xcopy radios \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios /e
-          xcopy io\out \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\io\out /e
-          xcopy D:\a\CP77_radioExt\CP77_radioExt\src\build\windows\x64\release\radioExt.asi \packed\bin\x64\plugins\ /e
+          xcopy \red4ext\RadioExt.dll \packed\red4ext\plugins\RadioExt /e
+          xcopy \red4ext\fmod.dll \packed\red4ext\plugins\RadioExt /e
       - name: Upload zip
         uses: actions/upload-artifact@v2
         with:
