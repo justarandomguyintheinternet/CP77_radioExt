@@ -12,10 +12,6 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v2
-      - uses: xmake-io/github-action-setup-xmake@master
-        with:
-          xmake-version: latest
-
       - name: Setup folder
         run: |
           cd ${{ github.workspace }}
@@ -29,8 +25,8 @@ jobs:
           xcopy metadata.json \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt /e
           xcopy modules \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules /e
           xcopy radios \packed\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios /e
-          xcopy \red4ext\RadioExt.dll \packed\red4ext\plugins\RadioExt /e
-          xcopy \red4ext\fmod.dll \packed\red4ext\plugins\RadioExt /e
+          xcopy red4ext\RadioExt.dll \packed\red4ext\plugins\RadioExt /e
+          xcopy red4ext\fmod.dll \packed\red4ext\plugins\RadioExt /e
       - name: Upload zip
         uses: actions/upload-artifact@v2
         with:
