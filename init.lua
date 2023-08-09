@@ -78,3 +78,4 @@ function radio:new()
 end
 
 return radio:new()
+-- sync
