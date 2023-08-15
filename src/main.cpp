@@ -4,6 +4,7 @@
 #include <RED4ext/Scripting/Natives/Generated/Vector4.hpp>
 #include <fmod.hpp>
 #include <fmod_errors.h>
+#include "SoundLoadData.hpp"
 
 #define RADIOEXT_VERSION 0.1
 #define CHANNELS 64
@@ -12,6 +13,7 @@ const RED4ext::Sdk* sdk;
 RED4ext::PluginHandle handle;
 FMOD::System* pSystem;
 FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
+SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
 
 // General purpose functions
 void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
@@ -26,6 +28,7 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
 void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 
 // Red4Ext Stuff
 void registerGeneralFunctions(RED4ext::CRTTISystem* rtti);
@@ -120,12 +123,17 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     setChannelPos->AddParam("Int32", "channelID");
     setChannelPos->AddParam("Vector4", "pos");
 
+    auto setMinMax = RED4ext::CClassStaticFunction::Create(&cls, "SetMinMax", "SetMinMax", &Set3DMinMax, { .isNative = true, .isStatic = true });
+    setMinMax->AddParam("Float", "min");
+    setMinMax->AddParam("Float", "max");
+
     cls.RegisterFunction(play);
     cls.RegisterFunction(setVolume);
     cls.RegisterFunction(setFalloff);
     cls.RegisterFunction(stop);
     cls.RegisterFunction(setListener);
     cls.RegisterFunction(setChannelPos);
+    cls.RegisterFunction(setMinMax);
 }
 
 void setFadeIn(FMOD::System* pSystem, FMOD::Channel* pChannel, float duration) {
@@ -152,7 +160,6 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     RED4ext::GetParameter(aFrame, &path);
     std::filesystem::path subDir = path.c_str();
     std::filesystem::path target = std::filesystem::current_path() / subDir;
-    sdk->logger->InfoF(handle, "GetSongLength(\"%s\")", target.string().c_str());
 
     unsigned int length = 0;
 
@@ -161,13 +168,13 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     // Only log if there is an error, as this gets called for allll the songs
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(error));
+        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
     }
 
     error = sound->getLength(&length, FMOD_TIMEUNIT_MS);
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s", FMOD_ErrorString(error));
+        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
     }
 
     if (aOut)
@@ -258,32 +265,25 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &fade);
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
-    FMOD::Sound* sound;
     FMOD_MODE mode = FMOD_3D;
     if (channelID == -1)
     {
         mode = FMOD_DEFAULT;
     }
 
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), mode, nullptr, &sound)));
-
-    unsigned int lengthMs = 0;
-    sound->getLength(&lengthMs, FMOD_TIMEUNIT_MS);
-    startPos = min(max(startPos, 0), lengthMs);
-
-    volume = max(0, volume);
-    channelID = min(CHANNELS, channelID);
-
     if (channelID == -1)
     {
         channelID = 0;
     }
 
-    sdk->logger->InfoF(handle, "FMOD::System::playSound: %s", FMOD_ErrorString(pSystem->playSound(sound, nullptr, false, &pChannels[channelID])));
-    sdk->logger->InfoF(handle, "FMOD::Channel::setPosition: %s", FMOD_ErrorString(pChannels[channelID]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
-    sdk->logger->InfoF(handle, "FMOD::Channel::setVolume: %s", FMOD_ErrorString(pChannels[channelID]->setVolume(volume)));
+    channelID = min(CHANNELS, channelID);
 
-    setFadeIn(pSystem, pChannels[channelID], fade);
+    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
+
+    loadData[channelID]->fade = fade;
+    loadData[channelID]->startPos = startPos;
+    loadData[channelID]->volume = volume;
+    loadData[channelID]->play = true; // Sound is loading, check if loading has finished
 
     aFrame->code++; // skip ParamEnd
 }
@@ -329,6 +329,27 @@ void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     aFrame->code++; // skip ParamEnd
 }
 
+void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    float min;
+    float max;
+    RED4ext::GetParameter(aFrame, &min);
+    RED4ext::GetParameter(aFrame, &max);
+
+    for (int i = 0; i <= CHANNELS; i++)
+    {
+        if (pChannels[i])
+        {
+            logError(pChannels[i]->set3DMinMaxDistance(min, max), "Set3DMinMax");
+        }
+    }
+
+    aFrame->code++; // skip ParamEnd
+}
+
 void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
@@ -344,6 +365,8 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     {
         channelID = 0;
     }
+
+    loadData[channelID]->play = false;
 
     if (pChannels[channelID])
     {
@@ -387,9 +410,7 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
 
     if (pChannels[channelID])
     {
-        FMOD_RESULT res = pChannels[channelID]->set3DAttributes(&posF, nullptr);
-        logError(res, "set3DListenerAttributes");
-
+        logError(pChannels[channelID]->set3DAttributes(&posF, nullptr), "set3DListenerAttributes");
     }
 
     aFrame->code++; // skip ParamEnd
@@ -432,10 +453,52 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
     upF.y = zProp->GetValue<float>(&up);
     upF.z = yProp->GetValue<float>(&up);
 
-    FMOD_RESULT res = pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF);
-    logError(res, "set3DListenerAttributes");
+    logError(pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF), "set3DListenerAttributes");
 
     aFrame->code++; // skip ParamEnd
+}
+
+void checkSoundLoad()
+{
+    for (int i = 0; i <= CHANNELS; i++)
+    {
+        if (!loadData[i]->sound || !loadData[i]->play)
+        {
+            continue;
+        }
+
+        FMOD_OPENSTATE state;
+        FMOD_RESULT result = loadData[i]->sound->getOpenState(&state, 0, 0, 0);
+
+        if (result != FMOD_OK)
+        {
+            logError(result, "getOpenState");
+            loadData[i]->play = false;
+        }
+
+        if (state == FMOD_OPENSTATE_READY)
+        {
+            loadData[i]->play = false;
+
+            sdk->logger->InfoF(handle, "FMOD::Sound::setMode: %s", FMOD_ErrorString(loadData[i]->sound->setMode(FMOD_3D_INVERSETAPEREDROLLOFF)));
+            logError(loadData[i]->sound->set3DMinMaxDistance(1, 10), "set3DMinMaxDistance");
+
+            unsigned int lengthMs = 0;
+            logError(loadData[i]->sound->getLength(&lengthMs, FMOD_TIMEUNIT_MS), "getLength");
+            int32_t startPos = min(max(loadData[i]->startPos, 0), lengthMs);
+
+            float volume = max(0, loadData[i]->volume);
+
+            sdk->logger->InfoF(handle, "FMOD::System::playSound: %s", FMOD_ErrorString(pSystem->playSound(loadData[i]->sound, nullptr, false, &pChannels[i])));
+            sdk->logger->InfoF(handle, "FMOD::Channel::setPosition: %s", FMOD_ErrorString(pChannels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
+            sdk->logger->InfoF(handle, "FMOD::Channel::setVolume: %s", FMOD_ErrorString(pChannels[i]->setVolume(volume)));
+
+            setFadeIn(pSystem, pChannels[i], loadData[i]->fade);
+        } else if(state == FMOD_OPENSTATE_ERROR) {
+            sdk->logger->ErrorF(handle, "Failed to load sound for channel %i", i);
+            loadData[i]->play = false;
+        }
+    }
 }
 
 bool Running_OnEnter(RED4ext::CGameApplication* aApp)
@@ -445,6 +508,7 @@ bool Running_OnEnter(RED4ext::CGameApplication* aApp)
 
 bool Running_OnUpdate(RED4ext::CGameApplication* aApp)
 {
+    checkSoundLoad();
     pSystem->update();
     return false;
 }
@@ -457,6 +521,7 @@ bool Running_OnExit(RED4ext::CGameApplication* aApp)
         {
             pChannels[i]->stop();
         }
+        delete loadData[i];
     }
 
     return true;
@@ -473,7 +538,13 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
 
         sdk->logger->InfoF(handle, "FMOD::System_Create %s", FMOD_ErrorString(FMOD::System_Create(&pSystem)));
         sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(CHANNELS, FMOD_INIT_3D_RIGHTHANDED, nullptr)));
-        sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.35)));
+        sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.325)));
+
+        for (int i = 0; i <= CHANNELS; i++)
+        {
+            loadData[i] = new SoundLoadData;
+            loadData[i]->play = false;
+        }
 
         RED4ext::GameState updateState;
         updateState.OnEnter = &Running_OnEnter;
