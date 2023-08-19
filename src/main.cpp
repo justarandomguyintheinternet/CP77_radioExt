@@ -11,6 +11,7 @@
 
 const RED4ext::Sdk* sdk;
 RED4ext::PluginHandle handle;
+std::filesystem::path root;
 FMOD::System* pSystem;
 FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
 SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
@@ -63,6 +64,15 @@ RED4EXT_C_EXPORT void RED4EXT_CALL PostRegisterTypes()
 
     registerGeneralFunctions(rtti);
     registerAudioFunctions(rtti);
+}
+
+// Provided by WSSDude / Andrej Redeky
+std::filesystem::path getExePath() {
+    wchar_t exePathBuf[MAX_PATH]{ 0 };
+    GetModuleFileName(GetModuleHandle(nullptr), exePathBuf, std::size(exePathBuf));
+    std::filesystem::path exePath = exePathBuf;
+
+    return exePath;
 }
 
 void logError(FMOD_RESULT result, const char* msg)
@@ -159,7 +169,7 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
     std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = std::filesystem::current_path() / subDir;
+    std::filesystem::path target = getExePath().parent_path() / subDir;
 
     unsigned int length = 0;
 
@@ -195,7 +205,7 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
     RED4ext::GetParameter(aFrame, &path);
 
     std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = std::filesystem::current_path() / subDir;
+    std::filesystem::path target = getExePath().parent_path() / subDir;
     sdk->logger->InfoF(handle, "GetFolders(%s)", target.string().c_str());
 
     RED4ext::DynArray<RED4ext::CString> folders;
@@ -265,6 +275,9 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &fade);
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
+    std::filesystem::path subDir = path.c_str();
+    std::filesystem::path target = getExePath().parent_path() / subDir;
+
     FMOD_MODE mode = FMOD_3D;
     if (channelID == -1)
     {
@@ -278,7 +291,7 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 
     channelID = min(CHANNELS, channelID);
 
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(path.c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
+    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(target.string().c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
 
     loadData[channelID]->fade = fade;
     loadData[channelID]->startPos = startPos;
@@ -410,7 +423,7 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
 
     if (pChannels[channelID])
     {
-        logError(pChannels[channelID]->set3DAttributes(&posF, nullptr), "set3DListenerAttributes");
+        logError(pChannels[channelID]->set3DAttributes(&posF, nullptr), "SetChannelTransform::set3DListenerAttributes");
     }
 
     aFrame->code++; // skip ParamEnd
@@ -453,7 +466,7 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
     upF.y = zProp->GetValue<float>(&up);
     upF.z = yProp->GetValue<float>(&up);
 
-    logError(pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF), "set3DListenerAttributes");
+    logError(pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF), "SetListenerTransform::set3DListenerAttributes");
 
     aFrame->code++; // skip ParamEnd
 }
@@ -535,6 +548,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
     {
         sdk = aSdk;
         handle = aHandle;
+        root = getExePath();
 
         sdk->logger->InfoF(handle, "FMOD::System_Create %s", FMOD_ErrorString(FMOD::System_Create(&pSystem)));
         sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(CHANNELS, FMOD_INIT_3D_RIGHTHANDED, nullptr)));
