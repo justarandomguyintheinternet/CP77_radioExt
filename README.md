@@ -16,7 +16,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 
 ### Folder Structure
 - First you will need to find the installation directory of your game
-- Next navigate to the radioExt folder: `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt`
+- Next, navigate to the radioExt folder: `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt`
 - In the radioExt folder you will see two items that will be important later: The template `metadata.json` file, and the `radios` folder
 	```
 	├── radioExt
@@ -26,7 +26,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 	```
 - Each station is a folder inside the `radios` folder, containing a `metadata.json` file, which contains the information regarding the station
 - So to create a new radio station firstly create a new folder inside the `radios` folder, and name it something unique (Like your station's name)
-- Next copy and paste the template `metadata.json` file from the mods root folder and paste it into your stations folder (The folder you created in the previous step)
+- Next, copy and paste the template `metadata.json` file from the mods root folder and paste it into your station's folder (The folder you created in the previous step)
 - The folder structure should now look as follows:
 	```
 	├── radioExt
@@ -36,21 +36,21 @@ A mod for CP2077 that allows for the addition of radio stations.
 	```
 
 ### Adding Songs
-- To add songs to your station, simply copy the song files into your stations folder
+- To add songs to your station, simply copy the song files into your station's folder
 - Supported formats are: `.mp3`, `.wav`, `.ogg`, `.flac`, `.mp2`, `.wax`, `.wma`
-- Keep in mind that the songs file names are being used as song names ingame, so keep them clean
+- Keep in mind that the songs file names are being used as song names in-game, so keep them clean
 - If you want to use a web audio stream instead of files shipped with your station, refer to the [Web Streams](#web-streams) section
 
 ### Metadata File
 
 - The `metadata.json` file of your stations defines its properties such as the name, icon and more.
 - Open it with any text editor that has **syntax highlighting for JSON files**, do **not** skip this, as most issues related to creating stations come from improperly edited JSON files.
-- If your `metadata.json` file is missing any properties that have been added in a update of the mod, simply run the game once with the updated version of the mod installed, as that will add the missing fields automatically
+- If your `metadata.json` file is missing any properties that have been added in an update of the mod, simply run the game once with the updated version of the mod installed, as that will add the missing fields automatically
 - For properties that use strings (Such as `displayName`) any [reserved characters](https://www.lambdatest.com/free-online-tools/json-escape) need to properly escaped, again any half decent text editor will let you know if you missed any.
 
 #### Basic Properties
 - `displayName`: This controls the name of your station that will be displayed in the game
-- `fm`: A number (Do not put it in quotation marks), which is used to place the station at the right place in the stations list. If the `displayName` has a FM number it should be the same
+- `fm`: A number (Do not put it in quotation marks), which is used to place the station at the right place in the stations list. If the `displayName` has an FM number, it should be the same
 - `volume`: Overall volume multiplier for the station (Also a number), make sure all songs have the same volume, then adjust the overall volume of the station with this value to match up with vanilla stations
 - `icon`: The icon for the station, if you don't use a custom one. It can be any `UIIcon.` record. To find a list of all records, open the CET console's `TweakDB Editor` tab, and enter `UIIcon.` in the search bar (Make sure you have the [tweakdb.str](https://cdn-l-cyberpunk.cdprojektred.com/metadata-1.5.2.zip) file placed inside the `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks` folder)
 
@@ -61,7 +61,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 - `inkAtlasPart` specifies which part of the `.inkatlas` should be used for the icon, e.g. `gryphon_5`
 - To create your own `.inkatlas` file, use [WolvenKit](https://github.com/WolvenKit/WolvenKit)
 - Written tutorials can be found [here](https://wiki.redmodding.org/cyberpunk-2077-modding/for-mod-creators/modding-guides/custom-icons-and-ui) (The tutorials are for clothing / item icons, but the exact same process applies to radio station icons)
-- A video tutorial can be found [here](https://www.youtube.com/watch?v=N8C8SaRypog) (WKit interface has change a bit since the video has been made, so not everything shown there is at the same place anymore, but the general process is still the exact same)
+- A video tutorial can be found [here](https://www.youtube.com/watch?v=N8C8SaRypog) (WKit interface has changed a bit since the video has been made, so not everything shown there is at the same place anymore, but the general process is still the exact same)
 
 #### Web Streams
 - Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`)
@@ -70,9 +70,9 @@ A mod for CP2077 that allows for the addition of radio stations.
 - `streamURL`: URL of the stream
 
 #### Song Ordering
-- The `order` field can be used to specify a order in which the songs should be played
+- The `order` field can be used to specify an order in which the songs should be played
 - It must not contain all the songs of the station, any songs not specified in the `order` will be played randomly before / after the ordered section
-- Simply add all the songs file names that you want ordered in the field, each its own string and comma sperated:
+- Simply add all the songs file names that you want ordered in the field, each as its own string and comma separated:
 ```json
 "order": [
      "firstSongFile.mp3",
@@ -82,20 +82,20 @@ A mod for CP2077 that allows for the addition of radio stations.
 ```
 
 ## Troubleshooting
-- If anything does not work as expexted, firstly make sure that all the points of the [How to use](#how-to-use) section are fullfilled, and the required mods are working properly
+- If anything does not work as expected, firstly make sure that all the points of the [How to use](#how-to-use) section are fulfilled, and the required mods are working properly
 - The mod prints messages to the CET console for most of the common issues, so open the CET console and look for any `"[RadioExt] Error/Warning: ..."` messages
 >`"[RadioExt] Error: Red4Ext part of the mod is missing"`
-- This means that the Red4Ext parts is either not installed, or could not be loaded by Red4Ext. Make sure you are on the most recent version of the game, and have the correct version of Red4Ext installed (Version of the game, version of Red4Ext and version of this mod must be compatible with each other). Also make sure that both the `RadioExt.dll` and `fmod.dll` files are present inside `Cyberpunk 2077\red4ext\plugins\RadioExt`
+- This means that the Red4Ext parts are either not installed, or could not be loaded by Red4Ext. Make sure you are on the most recent version of the game, and have the correct version of Red4Ext installed (Version of the game, version of Red4Ext and version of this mod must be compatible with each other). Also make sure that both the `RadioExt.dll` and `fmod.dll` files are present inside `Cyberpunk 2077\red4ext\plugins\RadioExt`
 > `"[RadioExt] Red4Ext Part is not up to date: Version is xxx Expected: xxx or newer"`
 - Make sure that the files inside `Cyberpunk 2077\red4ext\plugins\RadioExt` come from the same version of the mod you downloaded. Doing a clean install of the mod can help.
 > `[RadioMod] Could not find metadata.json file in "radios/folderName""`
  - This means that you forgot to add the `metadata.json file` (See [Folder Structure](#folder-structure) section)
 > `[RadioMod] Error: Failed to load the metadata.json file for "stationFolderName". Make sure the file is valid.`
-- This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commatas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
+- This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
 > `"[RadioExt] Warning: The file "songFile.mp3" requested for the ordering of station "Station Name" was not found."`
-- Make sure the file you specified in the `order` field does exists and that it's filename is spelled properly
+- Make sure the file you specified in the `order` field does exist and that its filename is spelled properly
 >`"[RadioExt] Error: Station "Station Name" is not a stream, but also has no song files. Using fallback webstream instead."`
-- This happens if there are no song files in a stations folder, but the `isStream` flag in its `metadata.json` file is also not set to `true`
+- This happens if there are no song files in a station's folder, but the `isStream` flag in its `metadata.json` file is also not set to `true`
 >`[RadioExt] Error: All channels used (Too many radios)`
 - This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 64, so this is extremely unlikely to ever happen)
 
