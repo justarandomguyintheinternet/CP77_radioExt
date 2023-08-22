@@ -110,7 +110,7 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     auto play = RED4ext::CClassStaticFunction::Create(&cls, "Play", "Play", &Play, {.isNative = true, .isStatic = true});
     play->AddParam("Int32", "channelID");
     play->AddParam("String", "path");
-    play->AddParam("Int32", "startPos");
+    play->AddParam("Int32", "startPos"); // -1 indicates stream
     play->AddParam("Float", "volume");
     play->AddParam("Float", "fade");
 
@@ -169,7 +169,7 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
     std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = getExePath().parent_path() / subDir;
+    std::filesystem::path target = root.parent_path() / subDir;
 
     unsigned int length = 0;
 
@@ -205,7 +205,7 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
     RED4ext::GetParameter(aFrame, &path);
 
     std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = getExePath().parent_path() / subDir;
+    std::filesystem::path target = root.parent_path() / subDir;
     sdk->logger->InfoF(handle, "GetFolders(%s)", target.string().c_str());
 
     RED4ext::DynArray<RED4ext::CString> folders;
@@ -276,7 +276,12 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
     std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = getExePath().parent_path() / subDir;
+    std::filesystem::path target = root.parent_path() / subDir;
+
+    if (startPos == -1) // Is a stream
+    {
+        target = subDir;
+    }
 
     FMOD_MODE mode = FMOD_3D;
     if (channelID == -1)

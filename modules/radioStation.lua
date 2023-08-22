@@ -137,9 +137,9 @@ function radio:activate(channel)
 
     self.channels[channel] = true
     if not self.metadata.streamInfo.isStream then
-        audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
+        audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
     else
-        audio.playFile(channel, self.metadata.streamInfo.streamURL, 0, self.volume)
+        audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
 end
 
@@ -162,7 +162,7 @@ function radio:startNewSong()
     for id, state in pairs(self.channels) do
         if state then
             Cron.After(0.05, function ()
-                audio.playFile(id, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick, self.volume)
+                audio.playFile(id, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
             end)
         end
     end
