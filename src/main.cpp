@@ -383,7 +383,7 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 
     if (pChannels[channelID])
     {
-        pChannels[channelID]->stop();
+        logError(pChannels[channelID]->stop(), "FMOD::Channel*->stop()");
         pChannels[channelID] = nullptr;
         sdk->logger->InfoF(handle, "Stopped channel %i", channelID);
     }
