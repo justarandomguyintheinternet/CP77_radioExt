@@ -1,5 +1,9 @@
 miscUtils = {}
 
+function miscUtils.isSameInstance(a, b)
+	return Game['OperatorEqual;IScriptableIScriptable;Bool'](a, b)
+end
+
 function miscUtils.deepcopy(origin)
 	local orig_type = type(origin)
     local copy

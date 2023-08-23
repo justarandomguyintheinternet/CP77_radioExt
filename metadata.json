@@ -1,11 +1,16 @@
 {
     "displayName" : "69.9 Your Station Name",
     "fm" : 69.9,
+    "volume" : 1.0,
     "icon" : "UIIcon.alcohol_absynth",
     "customIcon": {
         "inkAtlasPath": "path\\to\\custom\\atlas.inkatlas",
         "inkAtlasPart": "custom_texture_part",
         "useCustom": false
     },
-    "volume" : 1.0
+    "streamInfo": {
+        "streamURL": "https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3",
+        "isStream": false
+    },
+    "order": []
 }
