@@ -141,6 +141,8 @@ function radio:activate(channel)
     else
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
+
+    self:tryUpdateUI()
 end
 
 function radio:deactivate(channel)
@@ -165,6 +167,18 @@ function radio:startNewSong()
                 audio.playFile(id, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
             end)
         end
+    end
+
+    self:tryUpdateUI()
+end
+
+function radio:tryUpdateUI()
+    if self.channels[-1] then
+        Game.GetUISystem():QueueEvent(UIVehicleRadioEvent.new())
+
+        Cron.After(0.1, function ()
+            Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+        end)
     end
 end
 

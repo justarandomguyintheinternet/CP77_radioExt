@@ -6,7 +6,6 @@ function managerV:new(manager, radioMod)
 	local o = {}
 
     o.manager = manager
-    o.radios = {}
     o.isMounted = false
     o.rm = radioMod
 
@@ -66,6 +65,17 @@ function managerV:handleMenu()
             radio:deactivate(-1)
         end
     end
+end
+
+-- Returns data of radio station, if there is any active radio station being used for vehicle radio
+function managerV:getActiveStationData()
+    for _, radio in pairs(self.manager.radios) do
+        if radio.channels[-1] then
+            return {station = radio.name, track = radio.currentSong.path, isStream = radio.metadata.streamInfo.isStream}
+        end
+    end
+
+    return nil
 end
 
 function managerV:handleTS() -- trainSystem comp

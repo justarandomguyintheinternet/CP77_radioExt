@@ -88,9 +88,9 @@ A mod for CP2077 that allows for the addition of radio stations.
 - This means that the Red4Ext parts are either not installed, or could not be loaded by Red4Ext. Make sure you are on the most recent version of the game, and have the correct version of Red4Ext installed (Version of the game, version of Red4Ext and version of this mod must be compatible with each other). Also make sure that both the `RadioExt.dll` and `fmod.dll` files are present inside `Cyberpunk 2077\red4ext\plugins\RadioExt`
 > `"[RadioExt] Red4Ext Part is not up to date: Version is xxx Expected: xxx or newer"`
 - Make sure that the files inside `Cyberpunk 2077\red4ext\plugins\RadioExt` come from the same version of the mod you downloaded. Doing a clean install of the mod can help.
-> `[RadioMod] Could not find metadata.json file in "radios/folderName""`
+> `[RadioExt] Could not find metadata.json file in "radios/folderName""`
  - This means that you forgot to add the `metadata.json file` (See [Folder Structure](#folder-structure) section)
-> `[RadioMod] Error: Failed to load the metadata.json file for "stationFolderName". Make sure the file is valid.`
+> `[RadioExt] Error: Failed to load the metadata.json file for "stationFolderName". Make sure the file is valid.`
 - This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
 > `"[RadioExt] Warning: The file "songFile.mp3" requested for the ordering of station "Station Name" was not found."`
 - Make sure the file you specified in the `order` field does exist and that its filename is spelled properly
