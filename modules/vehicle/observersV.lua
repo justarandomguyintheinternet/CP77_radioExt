@@ -4,9 +4,7 @@ local utils = require("modules/utils/utils")
 local Cron = require("modules/utils/Cron")
 
 local observersV = {
-    radioUI = nil,
-    input = false,
-    customNotif = nil
+    input = false
 }
 
 function observersV.getStations() -- Return sorted list of all stations {fm, radioRecord}
@@ -43,6 +41,33 @@ end
 
 function observersV.init(radioMod)
     observersV.radioMod = radioMod
+
+    ObserveAfter("RadioStationListItemController", "UpdateEquializer", function (this)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
+
+        if this.stationData.record:DisplayName() == activeVRadio.station then
+            this.equilizerIcon:SetVisible(true)
+            this.codeTLicon:SetVisible(false)
+        else
+            this.equilizerIcon:SetVisible(false)
+            this.codeTLicon:SetVisible(true)
+        end
+    end)
+
+    ObserveAfter("VehicleRadioPopupGameController", "SetTrackName", function (this) -- Radio popup track name
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
+
+        local path = activeVRadio.track
+        if not activeVRadio.isStream then
+            path = utils.split(path, "\\")[2]
+            path = path:match("(.+)%..+$")
+        end
+
+        this.trackName:SetText(path)
+        this.trackName:SetVisible(true)
+    end)
 
     Override("VehicleRadioPopupGameController", "SetupData", function (this) -- Add stations to station list
         local sorted = observersV.getStations()
@@ -85,6 +110,10 @@ function observersV.init(radioMod)
         if radio then
             radioMod.radioManager.managerV:switchToRadio(radio)
             this.quickSlotsManager:SendRadioEvent(false, false, -1)
+
+            Cron.After(0.1, function ()
+                Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+            end)
         else
             radioMod.radioManager.managerV:disableCustomRadio()
         end
@@ -96,30 +125,29 @@ function observersV.init(radioMod)
         end)
     end)
 
-    Override("VehicleSummonWidgetGameController", "OnVehicleRadioEvent", function (this, evt) -- Radio info popup
-        this:PlayAnim("OnSongChanged", "OnTimeOut")
-        if IsDefined(this.playerVehicle) then
-            this.rootWidget:SetVisible(true)
-            inkWidgetRef.SetVisible(this.subText, true)
-            inkWidgetRef.SetVisible(this.radioStationName, true)
+    ObserveAfter("VehicleSummonWidgetGameController", "TryShowVehicleRadioNotification", function (this) -- Radio info popup
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
 
-            if observersV.customNotif then
-                inkTextRef.SetText(this.radioStationName, observersV.customNotif.name)
+        this:PlayAnimation("OnSongChanged", inkAnimOptions.new(), "OnTimeOut")
+        local dpadAction = DPADActionPerformed.new()
+        dpadAction.action = EHotkey.DPAD_RIGHT
+        dpadAction.state = EUIActionState.COMPLETED
+        this:QueueEvent(dpadAction)
 
-                local path = observersV.customNotif.path
-                if not observersV.customNotif.isStream then
-                    path = utils.split(path, "\\")[2]
-                    path = path:match("(.+)%..+$")
-                end
+        this.rootWidget:SetVisible(true)
+        inkWidgetRef.SetVisible(this.subText, true)
+        inkWidgetRef.SetVisible(this.radioStationName, true)
 
-                inkTextRef.SetText(this.subText, path)
-            else
-                inkTextRef.SetText(this.radioStationName, GetLocalizedTextByKey(this.playerVehicle:GetRadioReceiverStationName()))
-                inkTextRef.SetText(this.subText, GetLocalizedTextByKey(this.playerVehicle:GetRadioReceiverTrackName()))
-            end
+        inkTextRef.SetText(this.radioStationName, activeVRadio.station)
+
+        local path = activeVRadio.track
+        if not activeVRadio.isStream then
+            path = utils.split(path, "\\")[2]
+            path = path:match("(.+)%..+$")
         end
 
-        observersV.customNotif = nil
+        inkTextRef.SetText(this.subText, path)
     end)
 
     Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped) -- Handle radio shortcut press
@@ -164,7 +192,6 @@ function observersV.init(radioMod)
                         radioMod.radioManager.managerV:switchToRadio(nextCustom)
                         GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
                     end
-                    observersV.customNotif = {name = nextCustom.name, path = nextCustom.currentSong.path, isStream = nextCustom.metadata.streamInfo.isStream}
                 else
                     radioMod.radioManager.managerV:disableCustomRadio()
                     this:GetVehicle():SetRadioReceiverStation(stations[next].record:Index())
@@ -172,6 +199,11 @@ function observersV.init(radioMod)
 
                 this.vehicleBlackboard:SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, this:GetVehicle():GetRadioReceiverStationName())
                 Game.GetUISystem():QueueEvent(uiRadioEvent)
+
+                -- Delayed as it wont register otherwise?
+                Cron.After(0.1, function ()
+                    Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+                end)
             end
         else
             wrapped(evt)

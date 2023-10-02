@@ -3,29 +3,19 @@
 local observersP = {}
 
 function observersP.init(radioMod)
-    Override("RadioControllerPS", "InitializeRadioStations", function (this, wrapped)
-        if this.stationsInitialized then return end
-        wrapped()
-
-        local stations = this.stations
-
-        for _, radio in pairs(radioMod.radioManager.radios) do
-            local map = RadioStationsMap.new()
-            map.channelName = radio.name -- Name
-            map.stationID = ERadioStationList.NONE
-            table.insert(stations, map)
-        end
-
-        this.stations = stations
+    Override("RadioControllerPS", "GameAttached", function (this)
+        this.amountOfStations = 14 + #radioMod.radioManager.radios
+        this.activeChannelName = RadioStationDataProvider.GetChannelName(this:GetActiveRadioStation())
+        this:TryInitializeInteractiveState()
     end)
 
     Observe("Radio", "PlayGivenStation", function (this)
-        local map = this:GetDevicePS():GetStationByIndex(this:GetDevicePS():GetActiveStationIndex())
-        local radio = radioMod.radioManager:getRadioByName(map.channelName)
+        local active = this:GetDevicePS():GetActiveStationIndex()
 
-        if radio then
+        if active > 13 then
+            local radio = radioMod.radioManager.radios[active - 13]
+
             GameObject.AudioSwitch(this, "radio_station", "station_none", "radio")
-
             local object = radioMod.radioManager.managerP:getObjectByHandle(this)
             if object then
                 object:switchToRadio(radio)
@@ -54,10 +44,11 @@ function observersP.init(radioMod)
     end)
 
     Override("RadioInkGameController", "SetupStationLogo", function (this, wrapped)
-        local PS = this:GetOwner():GetDevicePS()
-        local map = PS:GetStationByIndex(PS:GetActiveStationIndex())
-        local radio = radioMod.radioManager:getRadioByName(map.channelName)
-        if radio then
+        local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
+
+        if active > 13 then
+            local radio = radioMod.radioManager.radios[active - 13]
+
             local iconRecord = TweakDBInterface.GetUIIconRecord(radio.icon)
             inkImageRef.SetAtlasResource(this.stationLogoWidget, iconRecord:AtlasResourcePath())
             inkImageRef.SetTexturePart(this.stationLogoWidget, iconRecord:AtlasPartName())
@@ -68,9 +59,12 @@ function observersP.init(radioMod)
     end)
 
     ObserveAfter("RadioInkGameController", "TurnOn", function (this)
-        local PS = this:GetOwner():GetDevicePS()
-        local map = PS:GetStationByIndex(PS:GetActiveStationIndex())
-        local radio = radioMod.radioManager:getRadioByName(map.channelName)
+        local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
+        if active < 14 then
+            return
+        end
+
+        local radio = radioMod.radioManager.radios[active - 13]
         if radio then
             inkTextRef.SetText(this.stationNameWidget, radio.name)
         end

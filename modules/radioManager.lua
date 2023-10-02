@@ -72,7 +72,7 @@ function radioManager:loadRadios() -- Loads radios
 
     for _, path in pairs(radios) do
         if not config.fileExists("radios/" .. path .. "/metadata.json") then
-            print("[RadioMod] Could not find metadata.json file in \"radios/" .. path .. "\"")
+            print("[RadioExt] Could not find metadata.json file in \"radios/" .. path .. "\"")
         else
             local songs = self:getSongLengths(path)
             local metadata
@@ -87,7 +87,7 @@ function radioManager:loadRadios() -- Loads radios
                 r:load(metadata, songs, path)
                 self.radios[#self.radios + 1] = r
             else
-                print("[RadioMod] Error: Failed to load the metadata.json file for \"" .. path .. "\". Make sure the file is valid.")
+                print("[RadioExt] Error: Failed to load the metadata.json file for \"" .. path .. "\". Make sure the file is valid.")
             end
         end
     end
