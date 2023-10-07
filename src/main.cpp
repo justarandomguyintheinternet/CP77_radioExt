@@ -6,7 +6,7 @@
 #include <fmod_errors.h>
 #include "SoundLoadData.hpp"
 
-#define RADIOEXT_VERSION 0.2
+#define RADIOEXT_VERSION 0.3
 #define CHANNELS 64
 
 const RED4ext::Sdk* sdk;
