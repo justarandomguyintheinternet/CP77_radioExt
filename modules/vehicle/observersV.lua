@@ -79,8 +79,11 @@ function observersV.init(radioMod)
             table.insert(stations, v.data)
         end
 
-        if GetMountedVehicle(GetPlayer()) then
+        this.dataSource:Reset(stations)
+        this.startupIndex = 0
+        this.currentRadioId = -1 -- Fallback if no match is found
 
+        if GetMountedVehicle(GetPlayer()) then
             local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             if GetLocalizedTextByKey(name) ~= "" then
                 name = GetLocalizedTextByKey(name)
@@ -91,12 +94,10 @@ function observersV.init(radioMod)
             for k, v in pairs(stations) do
                 if GetLocalizedText(v.record:DisplayName()) == name then
                     this.startupIndex = k - 1
+                    this.currentRadioId = k - 1
                 end
             end
-
         end
-
-        this.dataSource:Reset(stations)
     end)
 
     ObserveAfter("VehicleRadioPopupGameController", "Activate", function (this) -- Select radio station
