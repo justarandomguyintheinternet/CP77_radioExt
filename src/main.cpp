@@ -6,7 +6,7 @@
 #include <fmod_errors.h>
 #include "SoundLoadData.hpp"
 
-#define RADIOEXT_VERSION 0.3
+#define RADIOEXT_VERSION 0.4
 #define CHANNELS 64
 
 const RED4ext::Sdk* sdk;
@@ -571,7 +571,8 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::PluginHandle aHandle, RED4ext::
         updateState.OnExit = &Running_OnExit;
         aSdk->gameStates->Add(aHandle, RED4ext::EGameStateType::Running, &updateState);
 
-        RED4ext::RTTIRegistrator::Add(RegisterTypes, PostRegisterTypes);
+        RED4ext::CRTTISystem::Get()->AddRegisterCallback(RegisterTypes);
+        RED4ext::CRTTISystem::Get()->AddPostRegisterCallback(PostRegisterTypes);
 
         break;
     }
