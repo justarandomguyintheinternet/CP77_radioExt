@@ -202,4 +202,8 @@ function radio:generateShuffelBag()
     end
 end
 
+function radio:updateVolume(channel)
+    audio.setVolume(channel, self.volume)
+end
+
 return radio

@@ -210,6 +210,10 @@ function observersV.init(radioMod)
             wrapped(evt)
         end
     end)
+
+    Observe("RadioVolumeSettingsController", "ChangeValue", function ()
+        radioMod.radioManager:updateVRadioVolume()
+    end)
 end
 
 return observersV

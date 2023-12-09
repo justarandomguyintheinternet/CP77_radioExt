@@ -122,4 +122,12 @@ function radioManager:handleMenu()
     self.managerP:handleMenu()
 end
 
+function radioManager:updateVRadioVolume()
+    for _, radio in pairs(self.radios) do
+        if radio.channels[-1] then
+            radio:updateVolume(-1)
+        end
+    end
+end
+
 return radioManager
