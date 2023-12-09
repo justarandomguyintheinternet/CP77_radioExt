@@ -26,6 +26,18 @@ radio = {
 
 function radio:new()
     registerForEvent("onInit", function()
+        Observe("PocketRadio", "HandleVehicleRadioEvent", function (_, evt)
+            print("HandleVehicleRadioEvent", evt.station)
+        end)
+
+        Observe("PocketRadio", "HandleRadioToggleEvent", function ()
+            print("HandleRadioToggleEvent")
+        end)
+
+        Observe("PocketRadio", "HandleVehicleRadioStationChanged", function (_, evt)
+            print("HandleVehicleRadioStationChanged", evt.radioIndex)
+        end)
+
         math.randomseed(os.clock()) -- Prevent predictable random() behavior
 
         if not RadioExt then

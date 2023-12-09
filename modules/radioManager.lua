@@ -1,5 +1,4 @@
 local config = require("modules/utils/config")
-local Cron = require("modules/utils/Cron")
 
 local radioManager = {}
 
@@ -70,7 +69,7 @@ function radioManager:loadRadios() -- Loads radios
     local radios = RadioExt.GetFolders("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios")
     if not radios then return end
 
-    for _, path in pairs(radios) do
+    for index, path in pairs(radios) do
         if not config.fileExists("radios/" .. path .. "/metadata.json") then
             print("[RadioExt] Could not find metadata.json file in \"radios/" .. path .. "\"")
         else
@@ -84,7 +83,7 @@ function radioManager:loadRadios() -- Loads radios
                 self:backwardsCompatibility(metadata, path)
 
                 local r = require("modules/radioStation"):new(self.rm)
-                r:load(metadata, songs, path)
+                r:load(metadata, songs, path, index)
                 self.radios[#self.radios + 1] = r
             else
                 print("[RadioExt] Error: Failed to load the metadata.json file for \"" .. path .. "\". Make sure the file is valid.")
@@ -98,6 +97,16 @@ end
 function radioManager:getRadioByName(name)
     for _, radio in pairs(self.radios) do
         if name == radio.name then
+            return radio
+        end
+    end
+
+    return nil
+end
+
+function radioManager:getRadioByIndex(index)
+    for _, radio in pairs(self.radios) do
+        if index == radio.index then
             return radio
         end
     end

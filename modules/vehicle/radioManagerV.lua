@@ -36,21 +36,21 @@ function managerV:disableCustomRadio() -- Just stop playback
 end
 
 function managerV:update()
-    local veh = GetMountedVehicle(GetPlayer())
-    if veh then
-        self.isMounted = true
-        if veh:IsEngineTurnedOn() then
-            local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-            local radio = self:getRadioByName(name.value)
+    -- local veh = GetMountedVehicle(GetPlayer())
+    -- if veh then
+    --     self.isMounted = true
+    --     if veh:IsEngineTurnedOn() then
+    --         local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
+    --         local radio = self:getRadioByName(name.value)
 
-            if radio and not radio.channels[-1] then
-                radio:activate(-1)
-            end
-        end
-    elseif self.isMounted then
-        self.isMounted = false
-        self:disableCustomRadio()
-    end
+    --         if radio and not radio.channels[-1] then
+    --             radio:activate(-1)
+    --         end
+    --     end
+    -- elseif self.isMounted then
+    --     self.isMounted = false
+    --     self:disableCustomRadio()
+    -- end
 end
 
 function managerV:handleMenu()
