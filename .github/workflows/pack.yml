@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - fmod
+      - "2.1"
   workflow_dispatch:
 
 jobs:

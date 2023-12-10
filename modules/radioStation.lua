@@ -67,6 +67,7 @@ function radio:setupRecord(metadata, path)
     TweakDB:CloneRecord("RadioStation." .. path, "RadioStation.Pop")
     TweakDB:SetFlat("RadioStation." .. path .. ".displayName", self.name)
     TweakDB:SetFlat("RadioStation." .. path .. ".icon", self.icon)
+    TweakDB:SetFlat("RadioStation." .. path .. ".index", self.index)
     CName.add(self.name)
 
     if metadata.customIcon.useCustom then
@@ -78,7 +79,7 @@ function radio:setupRecord(metadata, path)
     end
 end
 
-function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all songs
+function radio:load(metadata, lengthData, path, index) -- metadata is the data provided by the user, lengthData is the length of all songs
     for k, v in pairs(lengthData) do
         table.insert(self.songs, {path = k, length = v})
     end
@@ -88,6 +89,7 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
     self.volume = metadata.volume
     self.metadata = metadata
     self.path = path
+    self.index = index + 13 -- Hardcoded 13 vanilla stations
 
     self:setupRecord(metadata, path)
     self:verifyOrder()
@@ -132,7 +134,7 @@ function radio:startRadioSimulation()
     end)
 end
 
-function radio:activate(channel)
+function radio:activate(channel, updateUI)
     if self.channels[channel] then return end
 
     self.channels[channel] = true
@@ -142,7 +144,9 @@ function radio:activate(channel)
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
 
-    self:tryUpdateUI()
+    if updateUI == true or updateUI == nil then
+        self:tryUpdateUI()
+    end
 end
 
 function radio:deactivate(channel)
@@ -200,6 +204,10 @@ function radio:generateShuffelBag()
     for i = #self.orderedSongs, 1, -1 do
         table.insert(self.shuffelBag, insertionIndex, self.orderedSongs[i])
     end
+end
+
+function radio:updateVolume(channel)
+    audio.setVolume(channel, self.volume)
 end
 
 return radio

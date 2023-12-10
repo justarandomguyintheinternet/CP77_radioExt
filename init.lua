@@ -7,7 +7,7 @@
 --    * You may not fork this code and make your own competing version of this mod available for download without my permission.
 -------------------------------------------------------------------------------------------------------------------------------
 
-local minR4Version = 0.4
+local minR4Version = 0.5
 
 radio = {
     runtimeData = {
@@ -21,7 +21,7 @@ radio = {
     Cron = require("modules/utils/Cron"),
     observersV = require("modules/vehicle/observersV"),
     observersP = require("modules/physical/observersP"),
-    version = 2.0
+    version = 2.4
 }
 
 function radio:new()
