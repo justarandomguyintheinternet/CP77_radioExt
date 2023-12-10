@@ -80,7 +80,66 @@ function observersV.init(radioMod)
     --     end
     -- end)
 
-    Override("")
+    Override("VehicleRadioPopupGameController", "Activate", function (this, wrapped) -- Select radio station
+        local name = this.selectedItem:GetStationData().record:DisplayName()
+        local radio = radioMod.radioManager:getRadioByName(name)
+
+        if radio then
+            this.quickSlotsManager:SendRadioEvent(false, false, -1)
+            radioMod.radioManager.managerV:switchToRadio(radio)
+            GetPlayer():GetPocketRadio().isOn = false
+
+            Cron.After(0.1, function ()
+                Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+            end)
+        else
+            if name == "LocKey#705" and GetMountedVehicle(GetPlayer()) then -- No station
+                GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, GetLocalizedText(name))
+            end
+
+            radioMod.radioManager.managerV:disableCustomRadio()
+            wrapped()
+        end
+    end)
+
+    Override("VehicleComponent", "OnRadioToggleEvent", function (this, evt, wrapped)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        if activeVRadio then
+            radioMod.radioManager.managerV:disableCustomRadio()
+            this.vehicleBlackboard:SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, false)
+            this:GetVehicle():ToggleRadioReceiver(false)
+            GetPlayer():GetPocketRadio().isOn = true -- This makes LITERALLY NO FUCKING SENSE
+
+            return
+        else
+            local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName) -- Get current radio name
+
+            if GetLocalizedTextByKey(name) ~= "" then
+                name = GetLocalizedTextByKey(name)
+            else
+                name = name.value
+            end
+            local cRadio = radioMod.radioManager:getRadioByName(name)
+
+            if cRadio then
+                radioMod.radioManager.managerV:switchToRadio(cRadio)
+                GetPlayer():GetPocketRadio().isOn = false
+                Cron.After(0.1, function ()
+                    Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+                end)
+            else
+                wrapped(evt)
+            end
+        end
+    end)
+
+    Override("PocketRadio", "IsActive", function (_, wrapped)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        if activeVRadio then return true end
+        return wrapped()
+    end)
 
     ObserveAfter("VehicleRadioPopupGameController", "SetupData", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
@@ -135,12 +194,31 @@ function observersV.init(radioMod)
     --     end
     -- end)
 
-    -- Override("PocketRadio", "HandleVehicleUnmounted", function (this, vehicle, wrapped)
-    --     if this.station < 13 then
-    --         wrapped(vehicle)
-    --     end
-    --     print(this.station, this.selectedStation)
-    -- end)
+    Override("PocketRadio", "HandleRadioToggleEvent", function (this, evt, wrapped)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        if activeVRadio then
+            radioMod.radioManager.managerV:disableCustomRadio()
+            this.isOn = true -- This makes LITERALLY NO FUCKING SENSE
+            this.station = activeVRadio.index
+
+            print("toggle off custom ", this.station)
+            return
+        else
+            print("toggle on ", this.station)
+            local cRadio = radioMod.radioManager:getRadioByIndex(this.station)
+
+            if cRadio then
+                radioMod.radioManager.managerV:switchToRadio(cRadio)
+                this.isOn = false
+                Cron.After(0.1, function ()
+                    Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+                end)
+            else
+                wrapped(evt)
+            end
+        end
+    end)
 
     -- Observe("ExitingEvents", "OnEnter", function () -- Normal car exiting
     --     Cron.After(0.5, function ()

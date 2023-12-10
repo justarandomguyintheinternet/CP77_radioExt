@@ -20,13 +20,11 @@ end
 function managerV:switchToRadio(radio) -- Set avtiveRadio var to the radio object
     if radio.channels[-1] then return end
     self:disableCustomRadio()
-    Cron.After(0.1, function()
-        if GetMountedVehicle(GetPlayer()) then
-            GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
-            GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, radio.name)
-        end
-        radio:activate(-1)
-    end)
+    if GetMountedVehicle(GetPlayer()) then
+        GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+        GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, radio.name)
+    end
+    radio:activate(-1)
 end
 
 function managerV:disableCustomRadio() -- Just stop playback
@@ -43,9 +41,9 @@ function managerV:update()
             local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             local radio = self:getRadioByName(name.value)
 
-            -- if radio and radio.channels[-1] then
-            --     veh:ToggleRadioReceiver(false)
-            --     radio:activate(-1)
+            if radio and not radio.channels[-1] and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true) then
+                radio:activate(-1)
+            end
             -- elseif radio and not radio.channels[-1] then
             --     veh:ToggleRadioReceiver(false)
             --     veh:SetRadioReceiverStation(-1)
