@@ -3,6 +3,10 @@
 local observersP = {}
 
 function observersP.init(radioMod)
+    ObserveAfter("RadioControllerPS", "OnNextStation", function (this, evt)
+        -- print(this.activeStation)
+    end)
+
     Override("RadioControllerPS", "GameAttached", function (this)
         this.amountOfStations = 14 + #radioMod.radioManager.radios
         this.activeChannelName = RadioStationDataProvider.GetChannelName(this:GetActiveRadioStation())
@@ -11,6 +15,8 @@ function observersP.init(radioMod)
 
     Observe("Radio", "PlayGivenStation", function (this)
         local active = this:GetDevicePS():GetActiveStationIndex()
+
+        -- print(active)
 
         if active > 13 then
             local radio = radioMod.radioManager.radios[active - 13]

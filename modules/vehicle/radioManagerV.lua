@@ -55,6 +55,7 @@ function managerV:update()
 end
 
 function managerV:handleMenu()
+    if not GetPlayer() then return end
     local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
 
     if radio then

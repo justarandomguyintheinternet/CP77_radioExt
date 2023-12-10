@@ -186,15 +186,15 @@ function observersV.init(radioMod)
         this.trackName:SetVisible(true)
     end)
 
-    ObserveAfter("PocketRadio", "TurnOn", function (this)
+    Observe("PocketRadio", "TurnOn", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-        if not GetMountedVehicle(GetPlayer()) and not activeVRadio then
-            local radio = radioMod.radioManager:getRadioByIndex(this.station)
+        local radio = radioMod.radioManager:getRadioByIndex(this.station)
+        if not GetMountedVehicle(GetPlayer()) and not activeVRadio and radio then
             radioMod.radioManager.managerV:switchToRadio(radio)
         end
     end)
 
-    ObserveAfter("PocketRadio", "TurnOff", function (this, state)
+    ObserveAfter("PocketRadio", "TurnOff", function ()
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
         radioMod.radioManager.managerV:disableCustomRadio()
