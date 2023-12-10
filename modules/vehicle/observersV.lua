@@ -7,38 +7,6 @@ local observersV = {
     input = false
 }
 
-function observersV.getStations() -- Return sorted list of all stations {fm, radioRecord}
-    local stations = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())
-    stations[1] = nil -- Get rid of the NoStation
-
-    local sorted = {}
-
-    for _, v in pairs(stations) do -- Store in temp table for sorting by fm number
-        local fm = string.gsub(GetLocalizedText(v.record:DisplayName()), ",", ".")
-
-        local split = utils.split(fm, " ")
-        if tonumber(split[1]) then
-            fm = tonumber(split[1])
-        else
-            fm = tonumber(split[#split])
-        end
-
-        if GetLocalizedText(v.record:DisplayName()) == "Enable Aux Radio" then fm = 0 end
-
-        sorted[#sorted + 1] = {data = v, fm = fm}
-    end
-
-    for _, radio in pairs(observersV.radioMod.radioManager.radios) do -- Add custom radios
-        sorted[#sorted + 1] = {data = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord(radio.tdbName)}), fm = tonumber(radio.fm)}
-    end
-
-    table.sort(sorted, function (a, b) -- Sort
-        return a.fm < b.fm
-    end)
-
-    return sorted
-end
-
 function observersV.init(radioMod)
     observersV.radioMod = radioMod
 
@@ -82,12 +50,13 @@ function observersV.init(radioMod)
     end)
 
     Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, stationIndex, wrapped)
+        print("send", stationIndex)
         local vehRadioEvent = VehicleRadioEvent.new()
         vehRadioEvent.toggle = toggle
         vehRadioEvent.setStation = setStation
         vehRadioEvent.station = -1
         if stationIndex >= 0 then
-            if stationIndex > 12 then
+            if stationIndex > 13 then
                 vehRadioEvent.station = stationIndex
             else
                 vehRadioEvent.station = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(stationIndex))
@@ -99,118 +68,74 @@ function observersV.init(radioMod)
         this.Player:QueueEvent(vehRadioEvent)
     end)
 
-    Override("VehicleRadioPopupGameController", "IsRadioReceiverActive", function (this, wrapped)
-        local state = wrapped()
-        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-
-        if activeVRadio then
-            return true
-        else
-            return state
-        end
-    end)
-
-    Override("VehicleRadioPopupGameController", "GetRadioReceiverStationName", function (this, wrapped)
-        local name = wrapped()
-        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-        print(GetLocalizedText(activeVRadio.station), GetLocalizedTextByKey(CName.new(activeVRadio.station)))
-
-        if not activeVRadio then
-            return name
-        else
-            return CName.new(activeVRadio.station)
-        end
-    end)
-
     Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped)
-        if evt.station > 12 then
-            print("play")
+        print("radioEve")
+        if evt.station > 13 then
             local station = radioMod.radioManager:getRadioByIndex(evt.station)
             radioMod.radioManager.managerV:switchToRadio(station)
             this:GetVehicle():ToggleRadioReceiver(false)
         else
-            print("stop")
             radioMod.radioManager.managerV:disableCustomRadio()
             wrapped(evt)
         end
     end)
 
-    ObserveAfter("RadioStationListItemController", "UpdateEquializer", function (this)
-        -- local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-        -- if not activeVRadio then return end
+    ObserveAfter("VehicleRadioPopupGameController", "SetupData", function (this)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
 
-        -- if this.stationData.record:DisplayName() == activeVRadio.station then
-        --     this.equilizerIcon:SetVisible(true)
-        --     this.codeTLicon:SetVisible(false)
-        -- else
-        --     this.equilizerIcon:SetVisible(false)
-        --     this.codeTLicon:SetVisible(true)
-        -- end
-        print("UpdateEquializer", this.currentRadioStationId, this.stationData.record:Index())
+        if not activeVRadio then return end
+
+        for i = 0, this.dataSource:GetArraySize() - 1 do
+            local stationRecord = this.dataSource:GetItem(i).record
+            if IsDefined(stationRecord) then
+                if stationRecord:Index() == activeVRadio.index then
+                    this.startupIndex = i
+                    this.currentRadioId = activeVRadio.index
+                end
+            end
+        end
     end)
 
-    -- ObserveAfter("VehicleRadioPopupGameController", "SetTrackName", function (this) -- Radio popup track name
-    --     local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-    --     if not activeVRadio then return end
+    ObserveAfter("RadioStationListItemController", "UpdateEquializer", function (this)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
 
-    --     local path = activeVRadio.track
-    --     if not activeVRadio.isStream then
-    --         path = utils.split(path, "\\")[2]
-    --         path = path:match("(.+)%..+$")
-    --     end
+        if this.stationData.record:DisplayName() == activeVRadio.station then
+            this.equilizerIcon:SetVisible(true)
+            this.codeTLicon:SetVisible(false)
+        else
+            this.equilizerIcon:SetVisible(false)
+            this.codeTLicon:SetVisible(true)
+        end
+    end)
 
-    --     this.trackName:SetText(path)
-    --     this.trackName:SetVisible(true)
-    -- end)
+    ObserveAfter("VehicleRadioPopupGameController", "SetTrackName", function (this) -- Radio popup track name
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
 
-    -- Override("VehicleRadioPopupGameController", "SetupData", function (this) -- Add stations to station list
-    --     local sorted = observersV.getStations()
-    --     local stations = {}
+        local path = activeVRadio.track
+        if not activeVRadio.isStream then
+            path = utils.split(path, "\\")[2]
+            path = path:match("(.+)%..+$")
+        end
 
-    --     stations[1] = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord("RadioStation.NoStation")}) -- Add NoStation
+        this.trackName:SetText(path)
+        this.trackName:SetVisible(true)
+    end)
 
-    --     for _, v in pairs(sorted) do -- Get rid of nested table structure
-    --         table.insert(stations, v.data)
-    --     end
+    Observe("PocketRadio", "HandleVehicleRadioEvent", function (this, evt)
+        if evt.station > 13 then
+            Game.GetAudioSystem():Play("dev_pocket_radio_off", this.player:GetEntityID(), "pocket_radio_emitter")
+            local station = radioMod.radioManager:getRadioByIndex(evt.station)
+            radioMod.radioManager.managerV:switchToRadio(station)
+        else
+            radioMod.radioManager.managerV:disableCustomRadio()
+        end
+    end)
 
-    --     this.dataSource:Reset(stations)
-    --     this.startupIndex = 0
-    --     this.currentRadioId = -1 -- Fallback if no match is found
-
-    --     if GetMountedVehicle(GetPlayer()) then
-    --         local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-    --         if GetLocalizedTextByKey(name) ~= "" then
-    --             name = GetLocalizedTextByKey(name)
-    --         else
-    --             name = name.value
-    --         end
-
-    --         for k, v in pairs(stations) do
-    --             if GetLocalizedText(v.record:DisplayName()) == name then
-    --                 this.startupIndex = k - 1
-    --                 this.currentRadioId = k - 1
-    --             end
-    --         end
-    --     end
-    -- end)
-
-    -- ObserveAfter("VehicleRadioPopupGameController", "Activate", function (this) -- Select radio station
-    --     local name = this.selectedItem:GetStationData().record:DisplayName()
-    --     local radio = radioMod.radioManager:getRadioByName(name)
-
-    --     if name == "LocKey#705" then -- No station
-    --         GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, GetLocalizedText(name))
-    --     end
-
-    --     if radio then
-    --         radioMod.radioManager.managerV:switchToRadio(radio)
-    --         this.quickSlotsManager:SendRadioEvent(false, false, -1)
-
-    --         Cron.After(0.1, function ()
-    --             Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
-    --         end)
-    --     else
-    --         radioMod.radioManager.managerV:disableCustomRadio()
+    -- Override("PocketRadio", "HandleVehicleMounted", function (this, wrapped)
+    --     if this.station < 13 then
+    --         wrapped()
     --     end
     -- end)
 
@@ -220,30 +145,30 @@ function observersV.init(radioMod)
     --     end)
     -- end)
 
-    -- ObserveAfter("VehicleSummonWidgetGameController", "TryShowVehicleRadioNotification", function (this) -- Radio info popup
-    --     local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-    --     if not activeVRadio then return end
+    ObserveAfter("VehicleSummonWidgetGameController", "TryShowVehicleRadioNotification", function (this) -- Radio info popup
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
 
-    --     this:PlayAnimation("OnSongChanged", inkAnimOptions.new(), "OnTimeOut")
-    --     local dpadAction = DPADActionPerformed.new()
-    --     dpadAction.action = EHotkey.DPAD_RIGHT
-    --     dpadAction.state = EUIActionState.COMPLETED
-    --     this:QueueEvent(dpadAction)
+        this:PlayAnimation("OnSongChanged", inkAnimOptions.new(), "OnTimeOut")
+        local dpadAction = DPADActionPerformed.new()
+        dpadAction.action = EHotkey.DPAD_RIGHT
+        dpadAction.state = EUIActionState.COMPLETED
+        this:QueueEvent(dpadAction)
 
-    --     this.rootWidget:SetVisible(true)
-    --     inkWidgetRef.SetVisible(this.subText, true)
-    --     inkWidgetRef.SetVisible(this.radioStationName, true)
+        this.rootWidget:SetVisible(true)
+        inkWidgetRef.SetVisible(this.subText, true)
+        inkWidgetRef.SetVisible(this.radioStationName, true)
 
-    --     inkTextRef.SetText(this.radioStationName, activeVRadio.station)
+        inkTextRef.SetText(this.radioStationName, activeVRadio.station)
 
-    --     local path = activeVRadio.track
-    --     if not activeVRadio.isStream then
-    --         path = utils.split(path, "\\")[2]
-    --         path = path:match("(.+)%..+$")
-    --     end
+        local path = activeVRadio.track
+        if not activeVRadio.isStream then
+            path = utils.split(path, "\\")[2]
+            path = path:match("(.+)%..+$")
+        end
 
-    --     inkTextRef.SetText(this.subText, path)
-    -- end)
+        inkTextRef.SetText(this.subText, path)
+    end)
 
     -- Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped) -- Handle radio shortcut press
     --     if evt.toggle and not evt.setStation then
@@ -305,9 +230,9 @@ function observersV.init(radioMod)
     --     end
     -- end)
 
-    -- Observe("RadioVolumeSettingsController", "ChangeValue", function ()
-    --     radioMod.radioManager:updateVRadioVolume()
-    -- end)
+    Observe("RadioVolumeSettingsController", "ChangeValue", function ()
+        radioMod.radioManager:updateVRadioVolume()
+    end)
 end
 
 return observersV

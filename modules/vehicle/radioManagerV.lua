@@ -71,7 +71,7 @@ end
 function managerV:getActiveStationData()
     for _, radio in pairs(self.manager.radios) do
         if radio.channels[-1] then
-            return {station = radio.name, track = radio.currentSong.path, isStream = radio.metadata.streamInfo.isStream}
+            return {station = radio.name, track = radio.currentSong.path, isStream = radio.metadata.streamInfo.isStream, index = radio.index}
         end
     end
 
