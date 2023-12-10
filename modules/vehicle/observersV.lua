@@ -49,36 +49,38 @@ function observersV.init(radioMod)
         return stations
     end)
 
-    Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, stationIndex, wrapped)
-        print("send", stationIndex)
-        local vehRadioEvent = VehicleRadioEvent.new()
-        vehRadioEvent.toggle = toggle
-        vehRadioEvent.setStation = setStation
-        vehRadioEvent.station = -1
-        if stationIndex >= 0 then
-            if stationIndex > 13 then
-                vehRadioEvent.station = stationIndex
-            else
-                vehRadioEvent.station = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(stationIndex))
-            end
-        end
-        if this.IsPlayerInCar then
-            this.Player:QueueEventForEntityID(this.PlayerVehicleID, vehRadioEvent)
-        end
-        this.Player:QueueEvent(vehRadioEvent)
-    end)
+    -- Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, stationIndex, wrapped)
+    --     print("send", stationIndex)
+    --     local vehRadioEvent = VehicleRadioEvent.new()
+    --     vehRadioEvent.toggle = toggle
+    --     vehRadioEvent.setStation = setStation
+    --     vehRadioEvent.station = -1
+    --     if stationIndex >= 0 then
+    --         if stationIndex > 13 then
+    --             vehRadioEvent.station = stationIndex
+    --         else
+    --             vehRadioEvent.station = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(stationIndex))
+    --         end
+    --     end
+    --     if this.IsPlayerInCar then
+    --         this.Player:QueueEventForEntityID(this.PlayerVehicleID, vehRadioEvent)
+    --     end
+    --     this.Player:QueueEvent(vehRadioEvent)
+    -- end)
 
-    Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped)
-        print("radioEve")
-        if evt.station > 13 then
-            local station = radioMod.radioManager:getRadioByIndex(evt.station)
-            radioMod.radioManager.managerV:switchToRadio(station)
-            GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
-        else
-            radioMod.radioManager.managerV:disableCustomRadio()
-            wrapped(evt)
-        end
-    end)
+    -- Override("VehicleComponent", "OnVehicleRadioEvent", function (this, evt, wrapped)
+    --     print("radioEve")
+    --     if evt.station > 13 then
+    --         local station = radioMod.radioManager:getRadioByIndex(evt.station)
+    --         radioMod.radioManager.managerV:switchToRadio(station)
+    --         GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
+    --     else
+    --         radioMod.radioManager.managerV:disableCustomRadio()
+    --         wrapped(evt)
+    --     end
+    -- end)
+
+    Override("")
 
     ObserveAfter("VehicleRadioPopupGameController", "SetupData", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
@@ -123,22 +125,22 @@ function observersV.init(radioMod)
         this.trackName:SetVisible(true)
     end)
 
-    Observe("PocketRadio", "HandleVehicleRadioEvent", function (this, evt)
-        if evt.station > 13 then
-            Game.GetAudioSystem():Play("dev_pocket_radio_off", this.player:GetEntityID(), "pocket_radio_emitter")
-            local station = radioMod.radioManager:getRadioByIndex(evt.station)
-            radioMod.radioManager.managerV:switchToRadio(station)
-        else
-            radioMod.radioManager.managerV:disableCustomRadio()
-        end
-    end)
+    -- Observe("PocketRadio", "HandleVehicleRadioEvent", function (this, evt)
+    --     if evt.station > 13 then
+    --         Game.GetAudioSystem():Play("dev_pocket_radio_off", this.player:GetEntityID(), "pocket_radio_emitter")
+    --         local station = radioMod.radioManager:getRadioByIndex(evt.station)
+    --         radioMod.radioManager.managerV:switchToRadio(station)
+    --     else
+    --         radioMod.radioManager.managerV:disableCustomRadio()
+    --     end
+    -- end)
 
-    Override("PocketRadio", "HandleVehicleUnmounted", function (this, vehicle, wrapped)
-        if this.station < 13 then
-            wrapped(vehicle)
-        end
-        print(this.station, this.selectedStation)
-    end)
+    -- Override("PocketRadio", "HandleVehicleUnmounted", function (this, vehicle, wrapped)
+    --     if this.station < 13 then
+    --         wrapped(vehicle)
+    --     end
+    --     print(this.station, this.selectedStation)
+    -- end)
 
     -- Observe("ExitingEvents", "OnEnter", function () -- Normal car exiting
     --     Cron.After(0.5, function ()
