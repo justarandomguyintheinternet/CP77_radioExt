@@ -67,6 +67,7 @@ function radio:setupRecord(metadata, path)
     TweakDB:CloneRecord("RadioStation." .. path, "RadioStation.Pop")
     TweakDB:SetFlat("RadioStation." .. path .. ".displayName", self.name)
     TweakDB:SetFlat("RadioStation." .. path .. ".icon", self.icon)
+    TweakDB:SetFlat("RadioStation." .. path .. ".index", self.index)
     CName.add(self.name)
 
     if metadata.customIcon.useCustom then
@@ -78,7 +79,7 @@ function radio:setupRecord(metadata, path)
     end
 end
 
-function radio:load(metadata, lengthData, path) -- metadata is the data provided by the user, lengthData is the length of all songs
+function radio:load(metadata, lengthData, path, index) -- metadata is the data provided by the user, lengthData is the length of all songs
     for k, v in pairs(lengthData) do
         table.insert(self.songs, {path = k, length = v})
     end
@@ -88,6 +89,7 @@ function radio:load(metadata, lengthData, path) -- metadata is the data provided
     self.volume = metadata.volume
     self.metadata = metadata
     self.path = path
+    self.index = index + 13 -- Hardcoded 13 vanilla stations
 
     self:setupRecord(metadata, path)
     self:verifyOrder()
