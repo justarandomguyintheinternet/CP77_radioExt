@@ -74,6 +74,7 @@ function observersV.init(radioMod)
             local station = radioMod.radioManager:getRadioByIndex(evt.station)
             radioMod.radioManager.managerV:switchToRadio(station)
             this:GetVehicle():ToggleRadioReceiver(false)
+            this:GetVehicle():SetRadioReceiverStation(-1)
         else
             radioMod.radioManager.managerV:disableCustomRadio()
             wrapped(evt)
@@ -133,11 +134,12 @@ function observersV.init(radioMod)
         end
     end)
 
-    -- Override("PocketRadio", "HandleVehicleMounted", function (this, wrapped)
-    --     if this.station < 13 then
-    --         wrapped()
-    --     end
-    -- end)
+    Override("PocketRadio", "HandleVehicleUnmounted", function (this, vehicle, wrapped)
+        if this.station < 13 then
+            wrapped(vehicle)
+        end
+        print(this.station, this.selectedStation)
+    end)
 
     -- Observe("ExitingEvents", "OnEnter", function () -- Normal car exiting
     --     Cron.After(0.5, function ()

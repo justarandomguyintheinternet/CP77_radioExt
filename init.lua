@@ -38,6 +38,14 @@ function radio:new()
             print("HandleVehicleRadioStationChanged", evt.radioIndex)
         end)
 
+        Observe("VehicleComponent", "OnRadioToggleEvent", function (_, evt)
+            print("OnRadioToggleEvent")
+        end)
+
+        Observe("VehicleComponent", "OnVehicleRadioEvent", function (_, evt)
+            print("OnVehicleRadioEvent")
+        end)
+
         math.randomseed(os.clock()) -- Prevent predictable random() behavior
 
         if not RadioExt then
