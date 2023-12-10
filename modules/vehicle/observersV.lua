@@ -73,8 +73,7 @@ function observersV.init(radioMod)
         if evt.station > 13 then
             local station = radioMod.radioManager:getRadioByIndex(evt.station)
             radioMod.radioManager.managerV:switchToRadio(station)
-            this:GetVehicle():ToggleRadioReceiver(false)
-            this:GetVehicle():SetRadioReceiverStation(-1)
+            GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
         else
             radioMod.radioManager.managerV:disableCustomRadio()
             wrapped(evt)

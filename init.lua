@@ -34,9 +34,9 @@ function radio:new()
             print("HandleRadioToggleEvent")
         end)
 
-        Observe("PocketRadio", "HandleVehicleRadioStationChanged", function (_, evt)
-            print("HandleVehicleRadioStationChanged", evt.radioIndex)
-        end)
+        -- Observe("PocketRadio", "HandleVehicleRadioStationChanged", function (_, evt)
+        --     print("HandleVehicleRadioStationChanged", evt.radioIndex)
+        -- end)
 
         Observe("VehicleComponent", "OnRadioToggleEvent", function (_, evt)
             print("OnRadioToggleEvent")

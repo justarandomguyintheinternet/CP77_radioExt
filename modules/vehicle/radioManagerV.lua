@@ -43,16 +43,14 @@ function managerV:update()
             local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             local radio = self:getRadioByName(name.value)
 
-
-
-            if radio and radio.channels[-1] then
-                veh:ToggleRadioReceiver(false)
-                radio:activate(-1)
-            elseif radio and not radio.channels[-1] then
-                veh:ToggleRadioReceiver(false)
-                veh:SetRadioReceiverStation(-1)
-                radio:activate(-1)
-            end
+            -- if radio and radio.channels[-1] then
+            --     veh:ToggleRadioReceiver(false)
+            --     radio:activate(-1)
+            -- elseif radio and not radio.channels[-1] then
+            --     veh:ToggleRadioReceiver(false)
+            --     veh:SetRadioReceiverStation(-1)
+            --     radio:activate(-1)
+            -- end
         end
     elseif self.isMounted then
         -- self.isMounted = false
