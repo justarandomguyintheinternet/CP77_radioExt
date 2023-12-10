@@ -2,9 +2,50 @@
 
 local observersP = {}
 
+local function handleActionNotifier(controller, evt)
+    local notifier = ActionNotifier.new()
+    notifier:SetNone()
+    if controller:IsDisabled() or controller:IsUnpowered() or not controller:IsON() then
+        return EntityNotificationType.DoNotNotifyEntity
+    end
+    controller:Notify(notifier, evt)
+    return EntityNotificationType.SendThisEventToEntity
+end
+
 function observersP.init(radioMod)
-    ObserveAfter("RadioControllerPS", "OnNextStation", function (this, evt)
-        -- print(this.activeStation)
+    -- 13 total vanilla stations, 4 is the first one
+    Override("RadioControllerPS", "OnNextStation", function (this, evt, wrapped)
+        if RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation) > 12 or this.activeStation > 13 then
+            this.previousStation = this.activeStation
+            this.activeStation = math.max(RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation), this.activeStation) + 1
+            if this.activeStation > 13 + #radioMod.radioManager.radios then
+                this.activeStation = 12
+                return wrapped(evt)
+            end
+
+            return handleActionNotifier(this, evt)
+        else
+            return wrapped(evt)
+        end
+    end)
+
+    Override("RadioControllerPS", "OnPreviousStation", function (this, evt, wrapped)
+        if this.activeStation > 13 then
+            this.previousStation = this.activeStation
+            this.activeStation = this.activeStation - 1
+            if this.activeStation < 14 then
+                this.activeStation = 4
+                return wrapped(evt)
+            end
+
+            return handleActionNotifier(this, evt)
+        elseif this.activeStation == 4 then
+            this.previousStation = this.activeStation
+            this.activeStation = 13 + #radioMod.radioManager.radios
+            return handleActionNotifier(this, evt)
+        else
+            return wrapped(evt)
+        end
     end)
 
     Override("RadioControllerPS", "GameAttached", function (this)
@@ -13,10 +54,16 @@ function observersP.init(radioMod)
         this:TryInitializeInteractiveState()
     end)
 
+    Override("RadioControllerPS", "SetDefaultRadioStation", function (this)
+        if not this.radioSetup.randomizeStartingStation then
+            this.activeStation = this.radioSetup.startingStation
+            return
+        end
+        this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
+    end)
+
     Observe("Radio", "PlayGivenStation", function (this)
         local active = this:GetDevicePS():GetActiveStationIndex()
-
-        -- print(active)
 
         if active > 13 then
             local radio = radioMod.radioManager.radios[active - 13]
