@@ -21,31 +21,11 @@ radio = {
     Cron = require("modules/utils/Cron"),
     observersV = require("modules/vehicle/observersV"),
     observersP = require("modules/physical/observersP"),
-    version = 2.0
+    version = 2.3
 }
 
 function radio:new()
     registerForEvent("onInit", function()
-        Observe("PocketRadio", "HandleVehicleRadioEvent", function (_, evt)
-            print("HandleVehicleRadioEvent", evt.station)
-        end)
-
-        Observe("PocketRadio", "HandleRadioToggleEvent", function ()
-            print("HandleRadioToggleEvent")
-        end)
-
-        -- Observe("PocketRadio", "HandleVehicleRadioStationChanged", function (_, evt)
-        --     print("HandleVehicleRadioStationChanged", evt.radioIndex)
-        -- end)
-
-        Observe("VehicleComponent", "OnRadioToggleEvent", function (_, evt)
-            print("OnRadioToggleEvent")
-        end)
-
-        Observe("VehicleComponent", "OnVehicleRadioEvent", function (_, evt)
-            print("OnVehicleRadioEvent")
-        end)
-
         math.randomseed(os.clock()) -- Prevent predictable random() behavior
 
         if not RadioExt then
