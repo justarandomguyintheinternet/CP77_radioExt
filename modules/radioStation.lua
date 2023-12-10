@@ -134,7 +134,7 @@ function radio:startRadioSimulation()
     end)
 end
 
-function radio:activate(channel)
+function radio:activate(channel, updateUI)
     if self.channels[channel] then return end
 
     self.channels[channel] = true
@@ -144,7 +144,9 @@ function radio:activate(channel)
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
 
-    self:tryUpdateUI()
+    if updateUI == true or updateUI == nil then
+        self:tryUpdateUI()
+    end
 end
 
 function radio:deactivate(channel)

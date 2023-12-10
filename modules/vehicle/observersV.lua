@@ -49,14 +49,45 @@ function observersV.init(radioMod)
         return stations
     end)
 
-    Override("VehicleRadioPopupGameController", "Activate", function (this, wrapped) -- Select radio station
+    Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, station, wrapped)
+        if station > 13 then
+            this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({toggle = false, setStation = false, station = -1})) -- Goes to the vehicle radio if there is any, disabling it
+            this.Player:QueueEvent(VehicleRadioEvent.new({toggle = toggle, setStation = setStation, station = station})) -- Goes to PocketRadio::HandleVehicleRadioEvent
+        else
+            wrapped(toggle, setStation, station)
+        end
+    end)
+
+    -- Used by PocketRadio when exiting a car, to transfer playback
+    Override("VehicleObject", "WasRadioReceiverPlaying", function (_, wrapped)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        if not activeVRadio then
+            return wrapped()
+        else
+            return true
+        end
+    end)
+
+    -- Used by PocketRadio when exiting a car, to transfer playback
+    Override("VehicleObject", "GetCurrentRadioIndex", function (_, wrapped)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        if not activeVRadio then
+            return wrapped()
+        else
+            return activeVRadio.index
+        end
+    end)
+
+    -- Selecting a radio from the radiolist
+    Override("VehicleRadioPopupGameController", "Activate", function (this, wrapped)
         local name = this.selectedItem:GetStationData().record:DisplayName()
         local radio = radioMod.radioManager:getRadioByName(name)
 
         if radio then
-            this.quickSlotsManager:SendRadioEvent(false, false, -1)
             radioMod.radioManager.managerV:switchToRadio(radio)
-            GetPlayer():GetPocketRadio().isOn = true
+            GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
 
             Cron.After(0.1, function ()
                 Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
@@ -71,14 +102,14 @@ function observersV.init(radioMod)
         end
     end)
 
+    -- Toggle shortcut for when in a vehicle
     Override("VehicleComponent", "OnRadioToggleEvent", function (this, evt, wrapped)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
 
-        if activeVRadio then
+        if activeVRadio then -- Toggle off
             radioMod.radioManager.managerV:disableCustomRadio()
             this.vehicleBlackboard:SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, false)
             this:GetVehicle():ToggleRadioReceiver(false)
-            GetPlayer():GetPocketRadio().isOn = true -- This makes LITERALLY NO FUCKING SENSE
 
             return
         else
@@ -91,9 +122,8 @@ function observersV.init(radioMod)
             end
             local cRadio = radioMod.radioManager:getRadioByName(name)
 
-            if cRadio then
+            if cRadio then -- Toggle on, last radio was a custom one
                 radioMod.radioManager.managerV:switchToRadio(cRadio)
-                GetPlayer():GetPocketRadio().isOn = false
                 Cron.After(0.1, function ()
                     Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
                 end)
@@ -103,12 +133,14 @@ function observersV.init(radioMod)
         end
     end)
 
+    -- For the RadioHotkey
     Override("PocketRadio", "IsActive", function (_, wrapped)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if activeVRadio then return true end
         return wrapped()
     end)
 
+    -- Fix list start/selected index
     ObserveAfter("VehicleRadioPopupGameController", "SetupData", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
 
@@ -125,6 +157,7 @@ function observersV.init(radioMod)
         end
     end)
 
+    -- Fix equalizer icon in radio list
     ObserveAfter("RadioStationListItemController", "UpdateEquializer", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
@@ -138,7 +171,8 @@ function observersV.init(radioMod)
         end
     end)
 
-    ObserveAfter("VehicleRadioPopupGameController", "SetTrackName", function (this) -- Radio popup track name
+    -- Radio popup track name
+    ObserveAfter("VehicleRadioPopupGameController", "SetTrackName", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
 
@@ -152,41 +186,28 @@ function observersV.init(radioMod)
         this.trackName:SetVisible(true)
     end)
 
-    Override("PocketRadio", "HandleRadioToggleEvent", function (this, evt, wrapped)
+    ObserveAfter("PocketRadio", "TurnOn", function (this)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-
-        if activeVRadio then
-            radioMod.radioManager.managerV:disableCustomRadio()
-            this.isOn = false -- This makes LITERALLY NO FUCKING SENSE
-            this.station = activeVRadio.index
-            return
-        else
-            local cRadio = radioMod.radioManager:getRadioByIndex(this.station)
-
-            if cRadio then
-                this.isOn = true
-
-                if not GetMountedVehicle(GetPlayer()) then
-                    radioMod.radioManager.managerV:switchToRadio(cRadio)
-                    Cron.After(0.1, function ()
-                        Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
-                    end)
-                end
-            else
-                wrapped(evt)
-            end
+        if not GetMountedVehicle(GetPlayer()) and not activeVRadio then
+            local radio = radioMod.radioManager:getRadioByIndex(this.station)
+            radioMod.radioManager.managerV:switchToRadio(radio)
         end
     end)
 
-    Observe("EnteringEvents", "OnEnter", function () -- Normal car exiting
+    ObserveAfter("PocketRadio", "TurnOff", function (this, state)
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if not activeVRadio then return end
+        radioMod.radioManager.managerV:disableCustomRadio()
+    end)
+
+    Observe("EnteringEvents", "OnEnter", function ()
         local cRadio = radioMod.radioManager.managerV:getActiveStationData()
 
         if cRadio then
-            GetPlayer():GetPocketRadio().isOn = true
-
             Cron.After(0.1, function ()
-                GetPlayer():GetQuickSlotsManager():SendRadioEvent(false, false, -1)
+                GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, cRadio.index)
                 Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
+                radioMod.radioManager.managerV:switchToRadio(cRadio)
             end)
             Cron.After(0.5, function ()
                 GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)

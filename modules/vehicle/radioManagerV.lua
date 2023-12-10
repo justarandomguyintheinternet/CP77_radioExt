@@ -36,32 +36,26 @@ end
 function managerV:update()
     local veh = GetMountedVehicle(GetPlayer())
     if veh then
-        -- self.isMounted = true
         if veh:IsEngineTurnedOn() then
             local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             local radio = self:getRadioByName(name.value)
 
             if radio and not radio.channels[-1] and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then
-                radio:activate(-1)
+                radio:activate(-1, false)
+                GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
             end
-            -- elseif radio and not radio.channels[-1] then
-            --     veh:ToggleRadioReceiver(false)
-            --     veh:SetRadioReceiverStation(-1)
-            --     radio:activate(-1)
-            -- end
         end
-    elseif self.isMounted then
-        -- self.isMounted = false
-        -- self:disableCustomRadio()
+    elseif GetPlayer():GetPocketRadio().isOn then
+        local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
+        if radio and not radio.channels[-1] then
+            radio:activate(-1, false)
+            GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
+        end
     end
 end
 
 function managerV:handleMenu()
-    local veh = GetMountedVehicle(GetPlayer())
-    if not veh then return end
-
-    local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
-    local radio = self:getRadioByName(name.value)
+    local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
 
     if radio then
         if radio.channels[-1] then
