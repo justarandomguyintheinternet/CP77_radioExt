@@ -43,6 +43,8 @@ function managerV:update()
             if radio and not radio.channels[-1] and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then
                 radio:activate(-1, false)
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
+            elseif radio and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then -- Make sure the car radio _really_ stays off
+                GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
             end
         end
     elseif GetPlayer():GetPocketRadio().isOn then

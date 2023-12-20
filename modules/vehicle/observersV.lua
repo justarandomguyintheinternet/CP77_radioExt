@@ -204,10 +204,11 @@ function observersV.init(radioMod)
         local cRadio = radioMod.radioManager.managerV:getActiveStationData()
 
         if cRadio then
+            local radio = radioMod.radioManager:getRadioByIndex(cRadio.index)
             Cron.After(0.1, function ()
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, cRadio.index)
                 Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
-                radioMod.radioManager.managerV:switchToRadio(cRadio)
+                radioMod.radioManager.managerV:switchToRadio(radio)
             end)
             Cron.After(0.5, function ()
                 GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
