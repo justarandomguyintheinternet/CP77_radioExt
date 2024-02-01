@@ -2,6 +2,20 @@ local config = require("modules/utils/config")
 
 local radioManager = {}
 
+local extensions = {
+    "mp3",
+    "mp2",
+    "flac",
+    "ogg",
+    "wav",
+    "wax",
+    "wma",
+    "opus",
+    "aiff",
+    "aif",
+    "aifc"
+}
+
 function radioManager:new(radioMod)
 	local o = {}
 
@@ -15,12 +29,21 @@ function radioManager:new(radioMod)
    	return setmetatable(o, self)
 end
 
+local function isValidExtension(extension)
+    for _, ext in pairs(extensions) do
+        if extension == ("." .. ext) then
+            return true
+        end
+    end
+    return false
+end
+
 function radioManager:getSongLengths(radioName)
     local songs = {}
 
     for _, file in pairs(dir("radios/" .. radioName .. "/")) do
         local extension = file.name:match("^.+(%..+)$")
-        if extension == ".flac" or extension == ".mp2" or extension == ".mp3" or extension == ".ogg" or extension == ".wav" or extension == ".wax" or extension == ".wma" then
+        if isValidExtension(extension) then
             local length = RadioExt.GetSongLength("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. radioName .. "\\" .. file.name)
             if length ~= 0 then
                 songs[radioName .. "\\" .. file.name] = length / 1000
