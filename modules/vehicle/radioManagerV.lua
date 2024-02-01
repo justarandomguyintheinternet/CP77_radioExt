@@ -40,10 +40,10 @@ function managerV:update()
             local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             local radio = self:getRadioByName(name.value)
 
-            if radio and not radio.channels[-1] and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then
+            if radio and not radio.channels[-1] then --and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true
                 radio:activate(-1, false)
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
-            elseif radio and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then -- Make sure the car radio _really_ stays off
+            elseif radio then -- Make sure the car radio _really_ stays off
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
             end
         end
@@ -59,11 +59,9 @@ end
 function managerV:handleMenu()
     if not GetPlayer() then return end
     local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
-
     if radio then
-        if radio.channels[-1] then
-            radio:deactivate(-1)
-        end
+        radio.channels[-1] = true -- hacky asf, no clue why it doesnt work otherwise
+        radio:deactivate(-1)
     end
 end
 
