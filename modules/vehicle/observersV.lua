@@ -190,8 +190,49 @@ function observersV.init(radioMod)
         this.trackName:SetVisible(true)
     end)
 
-    Observe("VehicleObject", "NextRadioReceiverStation", function (this, wrapped)
-        radioMod.radioManager.managerV:disableCustomRadio()
+    Override("VehicleObject", "NextRadioReceiverStation", function (this, wrapped)
+        wrapped()
+
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+
+        local currentStation = -1
+        if activeVRadio then
+            for index, station in pairs(VehiclesManagerDataHelper.GetRadioStations(GetPlayer())) do
+                if station.record:Index() == activeVRadio.index then
+                    currentStation = index
+                end
+            end
+        else
+            local name = this:GetRadioReceiverStationName()
+
+            for index, station in pairs(VehiclesManagerDataHelper.GetRadioStations(GetPlayer())) do
+                if GetLocalizedText(station.record:DisplayName()) == GetLocalizedText(name.value) then
+                    currentStation = index
+                end
+            end
+        end
+
+        local nextStation = currentStation + 1
+        if nextStation > #VehiclesManagerDataHelper.GetRadioStations(GetPlayer()) then
+            nextStation = 2
+        end
+
+        nextStation = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())[nextStation].record:Index()
+        if nextStation < 14 then
+            nextStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(nextStation))
+        end
+
+        local radio = radioMod.radioManager:getRadioByIndex(nextStation)
+
+        if nextStation > 13 then
+            this:SetRadioReceiverStation(-1)
+            this:GetVehicleComponent().radioState = true
+            this:ToggleRadioReceiver(false)
+            radioMod.radioManager.managerV:switchToRadio(radio)
+        else
+            radioMod.radioManager.managerV:disableCustomRadio()
+            wrapped()
+        end
     end)
 
     -- Handle radio station cycle hotkey
