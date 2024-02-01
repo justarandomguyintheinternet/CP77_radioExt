@@ -50,8 +50,8 @@ function managerV:update()
     elseif GetPlayer():GetPocketRadio().isOn then
         local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
         if radio and not radio.channels[-1] then
-            radio:activate(-1, false)
             GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
+            radio:activate(-1, false)
         end
     end
 end

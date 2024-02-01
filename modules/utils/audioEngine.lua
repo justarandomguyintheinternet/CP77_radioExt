@@ -5,6 +5,8 @@ local audio = {}
 local function getAdjustedVolume(channel, volume)
     if channel == -1 then
         volume = volume * (GameSettings.Get("/audio/volume/RadioportVolume") / 100)
+    else
+        volume = volume * 0.7
     end
     return volume * 0.4
 end
