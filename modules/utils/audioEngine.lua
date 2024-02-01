@@ -3,8 +3,12 @@ local GameSettings = require("modules/utils/GameSettings")
 local audio = {}
 
 local function getAdjustedVolume(channel, volume)
+    local mult = GameSettings.Get("/audio/volume/RadioportVolume")
+    if GetPlayer():GetMountedVehicle() then
+        mult = GameSettings.Get("/audio/volume/CarRadioVolume")
+    end
     if channel == -1 then
-        volume = volume * (GameSettings.Get("/audio/volume/RadioportVolume") / 100)
+        volume = volume * (mult / 100)
     else
         volume = volume * 0.7
     end

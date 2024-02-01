@@ -264,6 +264,7 @@ function observersV.init(radioMod)
                 GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
                 GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
             end)
+            radioMod.radioManager:updateVRadioVolume()
         else
             Cron.After(0.5, function ()
                 if GetPlayer():GetPocketRadio().isOn then
@@ -271,6 +272,10 @@ function observersV.init(radioMod)
                 end
             end)
         end
+    end)
+
+    Observe("ExitingEvents", "OnEnter", function ()
+        radioMod.radioManager:updateVRadioVolume()
     end)
 
     ObserveAfter("VehicleSummonWidgetGameController", "TryShowVehicleRadioNotification", function (this) -- Radio info popup
