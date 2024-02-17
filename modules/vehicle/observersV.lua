@@ -148,6 +148,15 @@ function observersV.init(radioMod)
         end
     end)
 
+    Override("PocketRadio", "HandleVehicleRadioStationChanged", function (this, evt, wrapped)
+        if this.settings:GetSyncToCarRadio() then
+            local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+            evt.radioIndex = activeVRadio.index
+        end
+        radioMod.logger.log("PocketRadio::HandleVehicleRadioStationChanged" .. tostring(evt.radioIndex))
+        wrapped(evt)
+    end)
+
     -- For the RadioHotkey
     Override("PocketRadio", "IsActive", function (_, wrapped)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()

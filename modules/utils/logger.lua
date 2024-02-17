@@ -7,21 +7,27 @@ local logger = {
 function logger.log(line)
     if not active then return end
 
-    if logger.lines[line] then
-        logger.lines[line] = logger.lines[line] + 1
-    else
-        logger.lines[line] = 1
+    local found = false
+    for _, data in pairs(logger.lines) do
+        if data.line == line then
+            data.num = data.num + 1
+            found = true
+        end
+    end
+
+    if not found then
+        table.insert(logger.lines, {line = line, num = 1})
     end
 end
 
 function logger.update()
     if not active then return end
 
-    for line, num in pairs(logger.lines) do
-        if num > 1 then
-            print(("%s | %d"):format(line, num))
+    for _, data in pairs(logger.lines) do
+        if data.num > 1 then
+            print(("%s | %d"):format(data.line, data.num))
         else
-            print(line)
+            print(data.line)
         end
     end
 
