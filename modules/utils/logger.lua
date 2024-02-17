@@ -1,4 +1,4 @@
-local active = true
+local active = false
 
 local logger = {
     lines = {}
