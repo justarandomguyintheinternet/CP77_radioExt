@@ -7,6 +7,34 @@ local observersV = {
     input = false
 }
 
+local function getNextStationIndex(currentStation)
+    -- Convert vanilla station to UI index (Same as what is stored in station record)
+    if currentStation < 14 and currentStation ~= -1 then
+        currentStation = RadioStationDataProvider.GetRadioStationUIIndex(currentStation)
+    end
+
+    -- Figure out index of station in list of stations
+    local cIndex = 0
+    for index, station in pairs(VehiclesManagerDataHelper.GetRadioStations(GetPlayer())) do
+        if station.record:Index() == currentStation then
+            cIndex = index
+        end
+    end
+
+    local nextStation = cIndex + 1
+    if nextStation > #VehiclesManagerDataHelper.GetRadioStations(GetPlayer()) then
+        nextStation = 2
+    end
+
+    nextStation = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())[nextStation].record:Index()
+
+    if nextStation < 14 then
+        nextStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(nextStation))
+    end
+
+    return nextStation
+end
+
 function observersV.init(radioMod)
     observersV.radioMod = radioMod
 
@@ -56,13 +84,15 @@ function observersV.init(radioMod)
         if station > 13 then
             if GetMountedVehicle(GetPlayer()) then
                 this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({toggle = false, setStation = false, station = -1})) -- Goes to the vehicle radio if there is any, disabling it
-            else
+            end
+            if not GetMountedVehicle(GetPlayer()) or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
                 this.Player:QueueEvent(VehicleRadioEvent.new({toggle = toggle, setStation = setStation, station = station})) -- Goes to PocketRadio::HandleVehicleRadioEvent
             end
 
             Cron.After(0.1, function ()
                 if GetMountedVehicle(GetPlayer()) then
                     GetMountedVehicle(GetPlayer()):GetVehicleComponent().radioState = true
+                    GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
                 end
             end)
         else
@@ -148,6 +178,7 @@ function observersV.init(radioMod)
         end
     end)
 
+    -- The event for this seems to come from engine side, always wants to set the last native station that it had, so this is needed to avoid the station getting set to some native one everytime a vehicle is entered
     Override("PocketRadio", "HandleVehicleRadioStationChanged", function (this, evt, wrapped)
         if this.settings:GetSyncToCarRadio() then
             local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
@@ -215,42 +246,18 @@ function observersV.init(radioMod)
         this.trackName:SetVisible(true)
     end)
 
-    -- When is this called?
+    -- TODO: Make this properly change the station, also for custom ones
     Observe("VehicleObject", "NextRadioReceiverStation", function (this, wrapped)
         radioMod.logger.log("VehicleObject::NextRadioReceiverStation")
         radioMod.radioManager.managerV:disableCustomRadio()
     end)
 
-    -- Handle radio station cycle hotkey
+    -- Handle radio station cycle hotkey, while on foot
     Override("PocketRadio", "HandleRadioToggleEvent", function (this, evt, wrapped)
         radioMod.logger.log("PocketRadio::HandleRadioToggleEvent")
         if not this.settings:GetCycleButtonPress() then return wrapped(evt) end
 
-        local currentStation = this.station
-
-        -- Convert vanilla station to UI index (Same as what is stored in station record)
-        if this.station < 14 and this.station ~= -1 then
-            currentStation = RadioStationDataProvider.GetRadioStationUIIndex(this.station)
-        end
-
-        -- Figure out index of station in list of stations
-        local cIndex = 0
-        for index, station in pairs(VehiclesManagerDataHelper.GetRadioStations(GetPlayer())) do
-            if station.record:Index() == currentStation then
-                cIndex = index
-            end
-        end
-
-        local nextStation = cIndex + 1
-        if nextStation > #VehiclesManagerDataHelper.GetRadioStations(GetPlayer()) then
-            nextStation = 2
-        end
-
-        nextStation = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())[nextStation].record:Index()
-
-        if nextStation < 14 then
-            nextStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(nextStation))
-        end
+        local nextStation = getNextStationIndex(this.station)
 
         this.selectedStation = nextStation
         this.station = this.selectedStation
@@ -258,6 +265,7 @@ function observersV.init(radioMod)
             local cycleEvent = UIVehicleRadioCycleEvent.new()
             Game.GetUISystem():QueueEvent(cycleEvent)
         end
+
         this:TurnOn(true)
     end)
 
@@ -306,8 +314,13 @@ function observersV.init(radioMod)
     end)
 
     -- Needed to turn radio off
-    Observe("PocketRadio", "HandleVehicleUnmounted", function (this)
-        radioMod.radioManager:updateVRadioVolume()
+    ObserveAfter("PocketRadio", "HandleVehicleUnmounted", function (this)
+        radioMod.logger.log("PocketRadio::HandleVehicleUnmounted")
+
+        -- Needs to wait for one frame, otherwise player would still be mounted
+        Cron.NextTick(function ()
+            radioMod.radioManager:updateVRadioVolume()
+        end)
 
         if (not this.settings:GetSyncToCarRadio()) and (not GetPlayer():GetPocketRadio().isOn) then
             this:TurnOff(true)

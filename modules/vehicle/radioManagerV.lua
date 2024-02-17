@@ -64,6 +64,11 @@ end
 function managerV:handleMenu()
     if not GetPlayer() then return end
     local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
+
+    if GetMountedVehicle(GetPlayer()) then
+        radio = self:getRadioByName(GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName).value)
+    end
+
     if radio then
         radio.channels[-1] = true -- hacky asf, no clue why it doesnt work otherwise
         radio:deactivate(-1)
