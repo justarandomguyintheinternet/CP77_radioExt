@@ -1,5 +1,3 @@
-local Cron   = require("modules/utils/Cron")
-
 local managerV = {}
 
 function managerV:new(manager, radioMod)
@@ -18,6 +16,7 @@ function managerV:getRadioByName(name)
 end
 
 function managerV:switchToRadio(radio) -- Set avtiveRadio var to the radio object
+    self.rm.logger.log("switchToRadio()", radio.channels[-1])
     if radio.channels[-1] then return end
     self:disableCustomRadio()
     if GetMountedVehicle(GetPlayer()) then
@@ -28,8 +27,13 @@ function managerV:switchToRadio(radio) -- Set avtiveRadio var to the radio objec
 end
 
 function managerV:disableCustomRadio() -- Just stop playback
+    self.rm.logger.log("disableCustomRadio()")
     for _, radio in pairs(self.manager.radios) do
         radio:deactivate(-1)
+    end
+
+    if GetMountedVehicle(GetPlayer()) then
+        GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, false)
     end
 end
 
@@ -40,18 +44,19 @@ function managerV:update()
             local name = veh:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName)
             local radio = self:getRadioByName(name.value)
 
-            if radio and not radio.channels[-1] then --and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true
+            if radio and not radio.channels[-1] and GetMountedVehicle(GetPlayer()):GetBlackboard():GetBool(GetAllBlackboardDefs().Vehicle.VehRadioState) == true then
                 radio:activate(-1, false)
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
+                self.rm.logger.log("Turned back on, because mounted, active, but was not playing")
             elseif radio then -- Make sure the car radio _really_ stays off
-                GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
+                -- GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
             end
         end
     elseif GetPlayer():GetPocketRadio().isOn then
         local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
         if radio and not radio.channels[-1] then
-            GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index)
-            radio:activate(-1, false)
+            GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, radio.index) -- Will call PocketRadio::TurnOn
+            self.rm.logger.log("Turned pocket radio back on, should be playing but wasnt")
         end
     end
 end
@@ -59,6 +64,11 @@ end
 function managerV:handleMenu()
     if not GetPlayer() then return end
     local radio = self.manager:getRadioByIndex(GetPlayer():GetPocketRadio().station)
+
+    if GetMountedVehicle(GetPlayer()) then
+        radio = self:getRadioByName(GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName).value)
+    end
+
     if radio then
         radio.channels[-1] = true -- hacky asf, no clue why it doesnt work otherwise
         radio:deactivate(-1)

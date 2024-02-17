@@ -6,6 +6,7 @@ on:
       - main
       - fmod
       - "2.1"
+      - dev
   workflow_dispatch:
 
 jobs:

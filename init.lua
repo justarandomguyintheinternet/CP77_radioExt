@@ -21,7 +21,8 @@ radio = {
     Cron = require("modules/utils/Cron"),
     observersV = require("modules/vehicle/observersV"),
     observersP = require("modules/physical/observersP"),
-    version = 2.4
+    logger = require("modules/utils/logger"),
+    version = 2.6
 }
 
 function radio:new()
@@ -69,6 +70,7 @@ function radio:new()
             self.Cron.Update(delta)
             self.radioManager:update()
             self.radioManager.managerV:handleTS()
+            self.logger.update()
         else
             self.radioManager:handleMenu()
         end
@@ -78,3 +80,14 @@ function radio:new()
 end
 
 return radio:new()
+
+-- NoSync:
+-- Car off, pocket on => Car turns on when entering
+-- Car on, pocket off => Exiting car pocket stays off
+
+-- Entering car with pocket on => Overrides car state
+-- Changing in car, then exiting => Pocket is independent
+
+-- Sync:
+-- Entering car with pocket on => Overrides car state | Same as NoSync
+-- Changing in car, then exiting => Overrides pocket | Only difference

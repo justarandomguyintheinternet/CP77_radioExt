@@ -155,6 +155,7 @@ function radioManager:handleMenu()
 end
 
 function radioManager:updateVRadioVolume()
+    self.rm.logger.log("updateVRadioVolume()")
     for _, radio in pairs(self.radios) do
         if radio.channels[-1] then
             radio:updateVolume(-1)
