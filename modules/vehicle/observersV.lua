@@ -283,6 +283,9 @@ function observersV.init(radioMod)
 
     ObserveAfter("PocketRadio", "TurnOff", function ()
         radioMod.logger.log("PocketRadio::TurnOff")
+
+        if GetMountedVehicle(GetPlayer()) then return end
+
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
         radioMod.radioManager.managerV:disableCustomRadio()
