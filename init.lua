@@ -22,7 +22,7 @@ radio = {
     observersV = require("modules/vehicle/observersV"),
     observersP = require("modules/physical/observersP"),
     logger = require("modules/utils/logger"),
-    version = 2.4
+    version = 2.6
 }
 
 function radio:new()
