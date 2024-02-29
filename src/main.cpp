@@ -6,7 +6,7 @@
 #include <fmod_errors.h>
 #include "SoundLoadData.hpp"
 
-#define RADIOEXT_VERSION 0.6
+#define RADIOEXT_VERSION 0.7
 #define CHANNELS 256
 
 const RED4ext::Sdk* sdk;
@@ -592,7 +592,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::PluginInfo* aInfo)
     aInfo->name = L"RadioExt";
     aInfo->author = L"keanuWheeze";
     aInfo->version = RED4EXT_SEMVER(2, 2, 0);
-    aInfo->runtime = RED4EXT_RUNTIME_LATEST;
+    aInfo->runtime = RED4EXT_RUNTIME_INDEPENDENT;
     aInfo->sdk = RED4EXT_SDK_LATEST;
 }
 
