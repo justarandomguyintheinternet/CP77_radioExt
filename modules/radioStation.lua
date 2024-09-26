@@ -28,6 +28,8 @@ function radio:new(radioMod)
 
     o.channels = {}
 
+    o.externalMediaActive = false
+
 	self.__index = self
    	return setmetatable(o, self)
 end
@@ -140,6 +142,9 @@ function radio:activate(channel, updateUI)
     self.channels[channel] = true
     if not self.metadata.streamInfo.isStream then
         audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
+    elseif self.fm == 0 and not self.externalMediaActive then
+        RadioExt.ToggleExternalMediaPlayback()
+        self.externalMediaActive = true
     else
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
@@ -153,7 +158,13 @@ function radio:deactivate(channel)
     if not self.channels[channel] then return end
 
     self.channels[channel] = false
-    audio.stopAudio(channel)
+
+    if self.externalMediaActive and self.fm == 0 then
+        RadioExt.ToggleExternalMediaPlayback()
+        self.externalMediaActive = false
+    else
+        audio.stopAudio(channel)
+    end
 end
 
 function radio:currentSongDone()

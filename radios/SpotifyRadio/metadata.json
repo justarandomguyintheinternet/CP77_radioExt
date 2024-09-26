@@ -1,0 +1,13 @@
+{
+    "displayName" : "0.0 Spotify Radio",
+    "fm" : 0,
+    "volume" : 1.0,
+    "icon" : "UIIcon.NoStation",
+    "customIcon": {
+        "useCustom": false
+    },
+    "streamInfo": {
+        "isStream": true
+    },
+    "order": []
+}
