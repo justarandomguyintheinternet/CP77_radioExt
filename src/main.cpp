@@ -30,6 +30,7 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
 void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void ToggleExternalMediaPlayback(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 
 // Red4Ext Stuff
 void registerGeneralFunctions(RED4ext::CRTTISystem* rtti);
@@ -137,6 +138,8 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     setMinMax->AddParam("Float", "min");
     setMinMax->AddParam("Float", "max");
 
+    auto toggleExternalMediaPlayback = RED4ext::CClassStaticFunction::Create(&cls, "ToggleExternalMediaPlayback", "ToggleExternalMediaPlayback", &ToggleExternalMediaPlayback, {.isNative = true, .isStatic = true});
+
     cls.RegisterFunction(play);
     cls.RegisterFunction(setVolume);
     cls.RegisterFunction(setFalloff);
@@ -144,6 +147,7 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     cls.RegisterFunction(setListener);
     cls.RegisterFunction(setChannelPos);
     cls.RegisterFunction(setMinMax);
+    cls.RegisterFunction(toggleExternalMediaPlayback);
 }
 
 void setFadeIn(FMOD::System* pSystem, FMOD::Channel* pChannel, float duration) {
@@ -474,6 +478,25 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
     logError(pSystem->set3DListenerAttributes(0, &posF, &velF, &forwardF, &upF), "SetListenerTransform::set3DListenerAttributes");
 
     aFrame->code++; // skip ParamEnd
+}
+
+void ToggleExternalMediaPlayback(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aFrame);
+    RED4EXT_UNUSED_PARAMETER(aOut);
+
+    INPUT input[2] = {};
+
+    input[0].type = INPUT_KEYBOARD;
+    input[0].ki.wVk = VK_MEDIA_PLAY_PAUSE;
+
+    input[1].type = INPUT_KEYBOARD;
+    input[1].ki.wVk = VK_MEDIA_PLAY_PAUSE;
+    input[1].ki.dwFlags = KEYEVENTF_KEYUP;
+
+    SendInput(2, input, sizeof(INPUT));
 }
 
 void checkSoundLoad()

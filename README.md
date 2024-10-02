@@ -51,6 +51,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 #### Basic Properties
 - `displayName`: This controls the name of your station that will be displayed in the game
 - `fm`: A number (Do not put it in quotation marks), which is used to place the station at the right place in the stations list. If the `displayName` has an FM number, it should be the same
+  - **Do not use 0 (or 0.0)** as that is reserved for the [Spotify Radio](#spotify-radio) and will not work for any custom radios.
 - `volume`: Overall volume multiplier for the station (Also a number), make sure all songs have the same volume, then adjust the overall volume of the station with this value to match up with vanilla stations
 - `icon`: The icon for the station, if you don't use a custom one. It can be any `UIIcon.` record. To find a list of all records, open the CET console's `TweakDB Editor` tab, and enter `UIIcon.` in the search bar (Make sure you have the [tweakdb.str](https://cdn-l-cyberpunk.cdprojektred.com/metadata-1.5.2.zip) file placed inside the `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks` folder)
 
@@ -80,6 +81,29 @@ A mod for CP2077 that allows for the addition of radio stations.
 	 "thirdSongFile.mp3"
 ]
 ```
+
+## Spotify Radio
+**Disclaimer: This functionality is still experimental and may be buggy.**
+
+**Do not delete or modify this radio station from the `radios` folder.**
+
+This radio station is included by default and allows music to be played from the Spotify app itself.
+
+The Spotify app (or any other media player that supports system transport controls) must be open and a song/playlist must already be selected. The radio will then automatically pause/play the music like any other radio station.
+
+Volume control is still handled by Spotify, so the in-game radio station volume control has no effect for this station.
+
+If the media player is supported, it should show an overlay when playing, pausing, or changing volume:
+![SMTC Supported Media Overlay](https://imgur.com/dUzqOgz.png)
+
+<details>
+	<summary><strong>What if I don't want to run Spotify while playing?</strong></summary>
+	At this time there are no plans to add functionality for natively playing Spotify audio in the game.
+</details>
+<details>
+	<summary><strong>Can I play any song/playlist?</strong></summary>
+	Yes. It's basically the same as listening to music on Spotify, except it automatically pauses/plays for more immersion (e.g. radio stops when pausing the game or entering a cutscene).
+</details>
 
 ## Troubleshooting
 - If anything does not work as expected, firstly make sure that all the points of the [How to use](#how-to-use) section are fulfilled, and the required mods are working properly
