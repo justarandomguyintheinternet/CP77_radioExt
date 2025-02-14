@@ -59,7 +59,12 @@ function observersP.init(radioMod)
             this.activeStation = this.radioSetup.startingStation
             return
         end
-        this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
+
+        if SETTINGS.includeCustomStationsInRandom then
+            this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
+        else
+            this.activeStation = math.random(0, 13)
+        end
     end)
 
     Observe("Radio", "PlayGivenStation", function (this)

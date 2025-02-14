@@ -1,5 +1,3 @@
-local config = require("modules/utils/config")
-
 local radioManager = {}
 
 local extensions = {
@@ -41,12 +39,12 @@ end
 function radioManager:getSongLengths(radioName)
     local songs = {}
 
-    for _, file in pairs(dir("radios/" .. radioName .. "/")) do
-        local extension = file.name:match("^.+(%..+)$")
+    for _, file in pairs(RadioExt.GetFiles("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. radioName)) do
+        local extension = file:match("^.+(%..+)$")
         if isValidExtension(extension) then
-            local length = RadioExt.GetSongLength("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. radioName .. "\\" .. file.name)
+            local length = RadioExt.GetSongLength("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. radioName .. "\\" .. file)
             if length ~= 0 then
-                songs[radioName .. "\\" .. file.name] = length / 1000
+                songs[radioName .. "\\" .. file] = length / 1000
             end
         end
     end
@@ -54,15 +52,15 @@ function radioManager:getSongLengths(radioName)
     return songs
 end
 
-function radioManager:backwardsCompatibility(metadata, path)
+function radioManager:backwardsCompatibility(metadata)
+    local updated = false
     if metadata.customIcon == nil then
         metadata.customIcon = {
             ["useCustom"] = false,
             ["inkAtlasPath"] = "",
             ["inkAtlasPart"] = ""
         }
-
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+        updated = true
     end
 
     if metadata.streamInfo == nil then
@@ -70,20 +68,34 @@ function radioManager:backwardsCompatibility(metadata, path)
             isStream = false,
             streamURL = ""
         }
-
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+        updated = true
     end
 
     if metadata.order == nil then
         metadata.order = {}
+        updated = true
+    end
 
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+    if updated then
+        return metadata
+    else
+        return nil
     end
 end
 
 function radioManager:init()
     self:loadRadios()
-    self.managerP = require("modules/physical/radioManagerP"):new(self)
+    -- Initialize physical radio manager when enabled in world, or create a safe dummy to absorb method calls when disabled
+    if SETTINGS.enableCustomStationsInWorldRadios then
+        self.managerP = require("modules/physical/radioManagerP"):new(self)
+    else
+        self.managerP = {}
+        setmetatable(self.managerP, {
+            __index = function() 
+                return function() end
+            end
+        })
+    end
     self.managerP:init()
     self.managerV = require("modules/vehicle/radioManagerV"):new(self, self.rm)
 end
@@ -91,20 +103,32 @@ end
 function radioManager:loadRadios() -- Loads radios
     local radios = RadioExt.GetFolders("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios")
     if not radios then return end
+    local config = require("modules/utils/config")
 
     for index, path in pairs(radios) do
-        if not config.fileExists("radios/" .. path .. "/metadata.json") then
-            print("[RadioExt] Could not find metadata.json file in \"radios/" .. path .. "\"")
+        local exist
+        local successE = pcall(function()
+            exist = config.fileExists("radios\\" .. path .. "\\metadata.json")
+        end)
+        if not successE or not exist then
+            print("[RadioExt] Could not find metadata.json file in \"radios\\" .. path .. "\"")
         else
             local songs = self:getSongLengths(path)
             local metadata
             local success = pcall(function ()
-                metadata = config.loadFile("radios/" .. path .. "/metadata.json")
+                metadata = config.loadFile("radios\\" .. path .. "\\metadata.json")
             end)
 
             if success then
-                self:backwardsCompatibility(metadata, path)
-
+                local newMetadata = self:backwardsCompatibility(metadata)
+                if newMetadata ~= nil then
+                    local successS = pcall(function()
+                        config.saveFile("radios\\" .. path .. "\\metadata.json", newMetadata)
+                    end)
+                    if not successS then
+                        print("[RadioExt] Could not write radios\\" .. path .. "\\metadata.json")
+                    end
+                end
                 local r = require("modules/radioStation"):new(self.rm)
                 r:load(metadata, songs, path, index)
                 self.radios[#self.radios + 1] = r

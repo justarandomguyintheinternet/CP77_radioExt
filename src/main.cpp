@@ -5,6 +5,11 @@
 #include <fmod.hpp>
 #include <fmod_errors.h>
 #include "SoundLoadData.hpp"
+#include <filesystem>
+#include <string>
+#include <Windows.h>
+#include <cstdio>
+#include <vector>
 
 #define RADIOEXT_VERSION 0.7
 #define CHANNELS 256
@@ -16,11 +21,56 @@ FMOD::System* pSystem;
 FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
 SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
 
+// Convert a UTF-8 encoded std::string to a wide string
+std::wstring UTF8ToWide(const std::string& utf8)
+{
+    if (utf8.empty())
+        return std::wstring();
+    int size_needed = MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, NULL, 0);
+    if (size_needed <= 0)
+        return std::wstring();
+    std::wstring wstr(size_needed, 0);
+    MultiByteToWideChar(CP_UTF8, 0, utf8.c_str(), -1, &wstr[0], size_needed);
+    if (!wstr.empty() && wstr.back() == L'\0')
+        wstr.pop_back();
+    return wstr;
+}
+
+// Convert a wide string to a UTF-8 encoded std::string
+std::string WideToUTF8(const std::wstring& wstr)
+{
+    if (wstr.empty())
+        return std::string();
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, NULL, 0, NULL, NULL);
+    if (size_needed <= 0)
+        return std::string();
+    std::string str(size_needed, 0);
+    WideCharToMultiByte(CP_UTF8, 0, wstr.c_str(), -1, &str[0], size_needed, NULL, NULL);
+    if (!str.empty() && str.back() == '\0')
+        str.pop_back();
+    return str;
+}
+
+// Convert a Windows std::filesystem::path (using wide characters internally) to a UTF-8 encoded std::string
+std::string toUTF8(const std::filesystem::path& path)
+{
+    return WideToUTF8(path.wstring());
+}
+
+// Convert a UTF-8 encoded string to a std::filesystem::path (constructed with wide characters)
+std::filesystem::path UTF8ToPath(const std::string& utf8)
+{
+    return std::filesystem::path(UTF8ToWide(utf8));
+}
+
 // General purpose functions
 void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
 void GetNumChannels(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, int32_t* aOut, int64_t a4);
 void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4);
+void GetFiles(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4);
 void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, int32_t* aOut, int64_t a4);
+void ReadFileWrapper(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::CString* aOut, int64_t a4);
+void WriteFileWrapper(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, bool* aOut, int64_t a4);
 
 // Audio playback functions
 void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
@@ -69,7 +119,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL PostRegisterTypes()
 // Provided by WSSDude / Andrej Redeky
 std::filesystem::path getExePath() {
     wchar_t exePathBuf[MAX_PATH]{ 0 };
-    GetModuleFileName(GetModuleHandle(nullptr), exePathBuf, std::size(exePathBuf));
+    GetModuleFileNameW(GetModuleHandle(nullptr), exePathBuf, MAX_PATH);
     std::filesystem::path exePath = exePathBuf;
 
     return exePath;
@@ -99,10 +149,26 @@ void registerGeneralFunctions(RED4ext::CRTTISystem* rtti)
     getFolders->AddParam("String", "path");
     getFolders->SetReturnType("array:String");
 
+    auto getFiles = RED4ext::CClassStaticFunction::Create(&cls, "GetFiles", "GetFiles", &GetFiles, { .isNative = true, .isStatic = true });
+    getFiles->AddParam("String", "path");
+    getFiles->SetReturnType("array:String");
+
+    auto readFileWrapper = RED4ext::CClassStaticFunction::Create(&cls, "ReadFileWrapper", "ReadFileWrapper", &ReadFileWrapper, { .isNative = true, .isStatic = true });
+    readFileWrapper->AddParam("String", "path");
+    readFileWrapper->SetReturnType("String");
+
+    auto writeFileWrapper = RED4ext::CClassStaticFunction::Create(&cls, "WriteFileWrapper", "WriteFileWrapper", &WriteFileWrapper, { .isNative = true, .isStatic = true });
+    writeFileWrapper->AddParam("String", "path");
+    writeFileWrapper->AddParam("String", "data");
+    writeFileWrapper->SetReturnType("Bool");
+
     cls.RegisterFunction(getLength);
     cls.RegisterFunction(getVersion);
     cls.RegisterFunction(getFolders);
+    cls.RegisterFunction(getFiles);
     cls.RegisterFunction(getChannels);
+    cls.RegisterFunction(readFileWrapper);
+    cls.RegisterFunction(writeFileWrapper);
 }
 
 void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
@@ -168,23 +234,27 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
 
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
-    std::filesystem::path subDir = path.c_str();
+    // Convert a UTF-8 path to a wide-character path
+    std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
     std::filesystem::path target = root.parent_path() / subDir;
 
     unsigned int length = 0;
 
     FMOD::Sound* sound;
-    FMOD_RESULT error = pSystem->createSound(target.string().c_str(), FMOD_CREATESTREAM, nullptr, &sound);
+    std::string targetUTF8 = toUTF8(target);
+    FMOD_RESULT error = pSystem->createSound(targetUTF8.c_str(), FMOD_CREATESTREAM, nullptr, &sound);
     // Only log if there is an error, as this gets called for allll the songs
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
+        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s",
+            FMOD_ErrorString(error), targetUTF8.c_str());
     }
 
     error = sound->getLength(&length, FMOD_TIMEUNIT_MS);
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
+        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s",
+            FMOD_ErrorString(error), targetUTF8.c_str());
     }
 
     if (aOut)
@@ -196,32 +266,79 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     aFrame->code++; // skip ParamEnd
 }
 
-void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4)
+void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
+    RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
 
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
-
-    std::filesystem::path subDir = path.c_str();
+    std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
     std::filesystem::path target = root.parent_path() / subDir;
-    sdk->logger->InfoF(handle, "GetFolders(%s)", target.string().c_str());
+    std::string targetUTF8 = toUTF8(target);
+    sdk->logger->InfoF(handle, "GetFolders(%s)", targetUTF8.c_str());
 
     RED4ext::DynArray<RED4ext::CString> folders;
 
-    for (const auto& entry : std::filesystem::directory_iterator(target))
-    {
-        if (entry.is_directory())
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(target, std::filesystem::directory_options::follow_directory_symlink))
         {
-            folders.PushBack(entry.path().filename().string());
+            if (entry.is_directory())
+            {
+                // Convert directory name to UTF-8
+                std::string folderName = WideToUTF8(entry.path().filename().wstring());
+                folders.PushBack(folderName.c_str());
+            }
         }
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        sdk->logger->ErrorF(handle, "Filesystem error: %s", e.what());
     }
 
     if (aOut)
     {
         auto type = RED4ext::CRTTISystem::Get()->GetType("array:String");
         type->Assign(aOut, &folders);
+    }
+
+    aFrame->code++; // skip ParamEnd
+}
+
+void GetFiles(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
+    RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    RED4ext::CString path;
+    RED4ext::GetParameter(aFrame, &path);
+    std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
+    std::filesystem::path target = root.parent_path() / subDir;
+    std::string targetUTF8 = toUTF8(target);
+    sdk->logger->InfoF(handle, "GetFiles(%s)", targetUTF8.c_str());
+
+    RED4ext::DynArray<RED4ext::CString> files;
+
+    try {
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(target, std::filesystem::directory_options::follow_directory_symlink))
+        {
+            if (entry.is_regular_file())
+            {
+                // Convert directory name to UTF-8
+                std::string fileName = WideToUTF8(entry.path().filename().wstring());
+                files.PushBack(fileName.c_str());
+            }
+        }
+    }
+    catch (const std::filesystem::filesystem_error& e) {
+        sdk->logger->ErrorF(handle, "Filesystem error: %s", e.what());
+    }
+
+    if (aOut)
+    {
+        auto type = RED4ext::CRTTISystem::Get()->GetType("array:String");
+        type->Assign(aOut, &files);
     }
 
     aFrame->code++; // skip ParamEnd
@@ -273,14 +390,15 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &startPos);
     RED4ext::GetParameter(aFrame, &volume);
     RED4ext::GetParameter(aFrame, &fade);
-    sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
+    sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)",
+        channelID, path.c_str(), startPos, volume, fade);
 
-    std::filesystem::path subDir = path.c_str();
+    std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
     std::filesystem::path target = root.parent_path() / subDir;
 
     if (startPos == -1) // Is a stream
     {
-        target = subDir;
+        target = UTF8ToPath(std::string(path.c_str()));
     }
 
     FMOD_MODE mode = FMOD_3D;
@@ -296,7 +414,10 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 
     channelID = min(CHANNELS, channelID);
 
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(target.string().c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
+    std::string targetUTF8 = toUTF8(target);
+    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s",
+        FMOD_ErrorString(pSystem->createStream(targetUTF8.c_str(),
+            mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
 
     loadData[channelID]->fade = fade;
     loadData[channelID]->startPos = startPos;
@@ -517,6 +638,84 @@ void checkSoundLoad()
             loadData[i]->play = false;
         }
     }
+}
+
+// Read file: Accepts a UTF-8 encoded path and returns the file content (UTF-8 encoded); if it fails, returns an empty string
+void ReadFileWrapper(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::CString* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    RED4ext::CString path;
+    RED4ext::GetParameter(aFrame, &path);
+    // Convert the UTF-8 path passed from Lua into a wide-character path
+    std::filesystem::path subPath = UTF8ToPath(std::string(path.c_str()));
+    std::filesystem::path fullPath = root.parent_path() / subPath;
+    std::wstring wPath = fullPath.wstring();
+    
+    FILE* fp = _wfopen(wPath.c_str(), L"rb");
+    if (!fp)
+    {
+        // If the file cannot be opened, return an empty string
+        RED4ext::CString empty("");
+        auto type = RED4ext::CRTTISystem::Get()->GetType("String");
+        type->Assign(aOut, &empty);
+        aFrame->code++;
+        return;
+    }
+    
+    // Get the file size
+    fseek(fp, 0, SEEK_END);
+    long fileSize = ftell(fp);
+    rewind(fp);
+
+    // Read the file content into a vector
+    std::vector<char> buffer(fileSize);
+    if (fileSize > 0)
+    {
+        fread(buffer.data(), 1, fileSize, fp);
+    }
+    fclose(fp);
+
+    // Construct a std::string (assuming the file content itself is UTF-8 encoded)
+    std::string content(buffer.begin(), buffer.end());
+    RED4ext::CString result(content.c_str());
+    
+    auto type = RED4ext::CRTTISystem::Get()->GetType("String");
+    type->Assign(aOut, &result);
+    
+    aFrame->code++;
+}
+
+// Write file: Accepts a UTF-8 encoded path and content, returns a Bool indicating whether the write was successful
+void WriteFileWrapper(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, bool* aOut, int64_t a4)
+{
+    RED4EXT_UNUSED_PARAMETER(a4);
+    RED4EXT_UNUSED_PARAMETER(aContext);
+
+    RED4ext::CString path;
+    RED4ext::CString content;
+    RED4ext::GetParameter(aFrame, &path);
+    RED4ext::GetParameter(aFrame, &content);
+    // Convert the path into a wide-character path
+    std::filesystem::path subPath = UTF8ToPath(std::string(path.c_str()));
+    std::filesystem::path fullPath = root.parent_path() / subPath;
+    std::wstring wPath = fullPath.wstring();
+
+    FILE* fp = _wfopen(wPath.c_str(), L"wb");
+    bool success = false;
+    if (fp)
+    {
+        std::string data(content.c_str());
+        size_t written = fwrite(data.data(), 1, data.size(), fp);
+        fclose(fp);
+        success = (written == data.size());
+    }
+    
+    auto type = RED4ext::CRTTISystem::Get()->GetType("Bool");
+    type->Assign(aOut, &success);
+    
+    aFrame->code++;
 }
 
 bool Running_OnEnter(RED4ext::CGameApplication* aApp)

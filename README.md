@@ -35,6 +35,20 @@ A mod for CP2077 that allows for the addition of radio stations.
 				└── metadata.json
 	```
 
+#### Using Symbolic Links
+Not enough space on your game installation drive, or want to place the radio folder somewhere else? No problem! You can put the radio folder wherever you like and then use a **symbolic link** to connect it to `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios`. The steps are simple:
+- Press **Windows+R**
+- Type `cmd` in the Run window
+- Press **Ctrl+Shift+Enter** to open the command prompt as an administrator
+- Enter the command `mklink /D [link] [target]` and press Enter to create the symbolic link. For example, if you want every directory under `D:\Music` to serve as a radio directory, and your game is installed at `E:\SteamLibrary\steamapps\common\Cyberpunk 2077`, then the command should be:  
+  `mklink /D "E:\SteamLibrary\steamapps\common\Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios" "D:\Music"`
+
+##### Note:
+- **Symbolic links are not shortcuts**; the mod does not support pointing the radio folder via shortcuts.
+- On Windows, symbolic links are supported only on the NTFS file system.
+- If you encounter compatibility issues, try deleting the symbolic link and moving the radio folder directly to its default location.
+- Generally, placing the radio folder on an HDD won’t noticeably affect performance, but if you have a large number of audio files or run into performance issues, consider moving the radio folder to an SSD.
+
 ### Adding Songs
 - To add songs to your station, simply copy the song files into your station's folder
 - Supported formats are: `.mp3`, `.wav`, `.ogg`, `.flac`, `.mp2`, `.wax`, `.wma`
@@ -81,6 +95,51 @@ A mod for CP2077 that allows for the addition of radio stations.
 ]
 ```
 
+## Configuration Options
+- Mod configuration file location:  
+  `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt`
+
+> `enableCustomStationsInWorldRadios`
+- **Boolean** (`true`/`false`)  
+  When `true`: Custom stations become available on **world radios** (environmental radio devices).  
+  When `false`: Custom stations only work on **vehicle radios**/player's portable radio.  
+  Default: `true`
+
+> `includeCustomStationsInRandom`
+- **Boolean** (`true`/`false`)  
+  When `true`: World radios will **randomize to custom stations**.  
+  When `false`: World radios only cycle through **vanilla stations**.  
+  Default: `false`  
+  **⚠️ Warning:** Only enable this if you fully understand the implications. See important notes below.
+
+## ⚠️ Important Notes
+
+### Save File Safety
+- **World radio modifications are PERSISTENT**  
+  If you save the game with a world radio tuned to custom stations:
+  - Radio will become **silent** after mod uninstallation
+  - Recovery requires **manual intervention**
+
+### Recovery Options
+1. **Before uninstalling**:  
+   Tune all modified world radios back to **vanilla stations**
+2. **After uninstalling**:  
+   Cycle station once on affected radios to restore functionality
+
+### Critical Limitations
+- 🔴 `enableCustomStationsInWorldRadios = false` **WILL NOT**  
+  - Fix existing modified radios in save files  
+  - Remove custom station assignments  
+  *Manual reset is always required*
+
+### Safety Lock Mechanism
+World radios **will NEVER auto-randomize** to custom stations unless:
+```lua
+-- Both conditions must be true
+enableCustomStationsInWorldRadios = true
+includeCustomStationsInRandom = true
+```
+
 ## Troubleshooting
 - If anything does not work as expected, firstly make sure that all the points of the [How to use](#how-to-use) section are fulfilled, and the required mods are working properly
 - The mod prints messages to the CET console for most of the common issues, so open the CET console and look for any `"[RadioExt] Error/Warning: ..."` messages
@@ -92,12 +151,14 @@ A mod for CP2077 that allows for the addition of radio stations.
  - This means that you forgot to add the `metadata.json file` (See [Folder Structure](#folder-structure) section)
 > `[RadioExt] Error: Failed to load the metadata.json file for "stationFolderName". Make sure the file is valid.`
 - This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
+> `[RadioExt] Warning: Failed to load the settings.json,use default settings.`
+- This means the `settings.json` file is corrupted / not valid / lacks essential configuration entries. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
 > `"[RadioExt] Warning: The file "songFile.mp3" requested for the ordering of station "Station Name" was not found."`
 - Make sure the file you specified in the `order` field does exist and that its filename is spelled properly
 >`"[RadioExt] Error: Station "Station Name" is not a stream, but also has no song files. Using fallback webstream instead."`
 - This happens if there are no song files in a station's folder, but the `isStream` flag in its `metadata.json` file is also not set to `true`
 >`[RadioExt] Error: All channels used (Too many radios)`
-- This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 64, so this is extremely unlikely to ever happen)
+- This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 256, so this is extremely unlikely to ever happen)
 
 #### Credits
 - Uses [FMOD](https://www.fmod.com/) by Firelight Technologies

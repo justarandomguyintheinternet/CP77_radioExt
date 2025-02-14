@@ -1,43 +1,49 @@
 local config = {}
 
+-- Check if the file exists (if the content cannot be read, the file is considered non-existent)
 function config.fileExists(filename)
-    local f=io.open(filename,"r")
-    if (f~=nil) then io.close(f) return true else return false end
+    local content = RadioExt.ReadFileWrapper("plugins\\cyber_engine_tweaks\\mods\\radioExt\\" .. filename)
+    return content ~= nil and content ~= ""
 end
 
 function config.tryCreateConfig(path, data)
-	if not config.fileExists(path) then
-        local file = io.open(path, "w")
+    if not config.fileExists(path) then
         local jconfig = json.encode(data)
-        file:write(jconfig)
-        file:close()
+        RadioExt.WriteFileWrapper(path, jconfig)
     end
 end
 
 function config.loadFile(path)
-    local file = io.open(path, "r")
-    local config = json.decode(file:read("*a"))
-    file:close()
-    return config
+    local content = RadioExt.ReadFileWrapper("plugins\\cyber_engine_tweaks\\mods\\radioExt\\" .. path)
+    local configData = json.decode(content)
+    return configData
 end
 
 function config.saveFile(path, data)
-    local file = io.open(path, "w")
     local jconfig = json.encode(data)
-    file:write(jconfig)
-    file:close()
+    RadioExt.WriteFileWrapper("plugins\\cyber_engine_tweaks\\mods\\radioExt\\" .. path, jconfig)
 end
 
 function config.backwardComp(path, data)
-    local f = config.loadFile(path)
-
+    local f = nil
+    local successL = pcall(function()
+        f = config.loadFile(path)
+    end)
+    if not successL or not f then
+        print("[RadioExt] Could not read" .. path)
+        return
+    end
     for k, e in pairs(data) do
         if f[k] == nil then
             f[k] = e
         end
     end
-
-    config.saveFile(path, f)
+    local successS = pcall(function()
+        config.saveFile(path, f)
+    end)
+    if not successS then
+        print("[RadioExt] Could not write" .. path)
+    end
 end
 
 return config
