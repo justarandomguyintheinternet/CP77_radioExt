@@ -120,6 +120,19 @@ Not enough space on your game installation drive, or want to place the radio fol
   - Radio will become **silent** after mod uninstallation
   - Recovery requires **manual intervention**
 
+### 🔴 Critical Exceptions
+- **Growl FM Party Radio Corruption**  
+  Visiting the "Growl FM Party" scene with both settings enabled：
+  ```
+  includeCustomStationsInRandom = true
+  enableCustomStationsInWorldRadios = true
+  ```
+  
+  **Permanent consequences:**
+  - Radio stuck on incorrect station (can't switch)
+  - Original Growl FM content fails to play
+  - No recovery through normal gameplay
+
 ### Recovery Options
 1. **Before uninstalling**:  
    Tune all modified world radios back to **vanilla stations**

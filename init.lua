@@ -68,36 +68,32 @@ function radio:new()
 
         if SETTINGS.enableCustomStationsInWorldRadios then
             print([[
-[RadioExt] Warning: Custom stations are ENABLED on WORLD RADIOS (environmental radio devices).
+[RadioExt] Warning: Custom stations are ENABLED on WORLD RADIOS (environmental devices).
 ---------------------------------------------------------------
-- If you save the game with a world radio tuned to custom stations:
-    - The radio will become SILENT after mod uninstallation
-    - RECOVERY OPTIONS:
-    1) Before uninstalling: Tune radios to vanilla stations OR
-    2) After uninstalling: Cycle station once to reset
-    - NOTE: Setting [enableCustomStationsInWorldRadios = false] 
-    WON'T FIX existing modified radios - manual reset is required
-
-- Safety Lock Mechanism:
-    - World radios will NEVER auto-randomize to custom stations 
-    unless BOTH conditions are met:
-    1) [enableCustomStationsInWorldRadios = true] AND
-    2) [includeCustomStationsInRandom = true]
-    - This prevents accidental exposure to custom content
-
-- SAFER ALTERNATIVE:
-    Set [enableCustomStationsInWorldRadios = false] to:
-    - Restrict custom stations to VEHICLES/PLAYER RADIO ONLY
-    - Eliminate world radio modifications in saves
+- Saving with a world radio on custom stations causes PERMANENT MALFUNCTION after mod uninstall
+- Set [enableCustomStationsInWorldRadios = false] to prevent issues (won't fix existing ones)
+- Affected radios require MANUAL station cycling to recover functionality
     ]])
         end
 
         if SETTINGS.includeCustomStationsInRandom then
             print([[
-[RadioExt] Warning: Radios in the world will now randomly select custom stations. 
+[RadioExt] Warning: Radios in the world will now randomly select custom stations.
 ---------------------------------------------------------------
-- This may PERMANENTLY affect your save files and cause malfunctioning radios in saves after mod uninstallation. 
-- If you wish to prevent this mod from altering your saves, set 'includeCustomStationsInRandom' to false in the config.
+- World radios may choose custom stations when first loaded. If randomized to custom stations:
+  State WILL BE PERMANENTLY SAVED (silent after mod uninstall)
+  Can affect multiple radios in save files without notice
+
+- Recovery: You MUST manually cycle stations on ALL affected radios
+
+- Critical Warning: 
+  Growl FM Party radio becomes UNFIXABLE 
+  (station switching physically blocked)
+
+- Essential precaution: 
+  Keep [includeCustomStationsInRandom = false] to avoid these risks
+
+* (This setting requires [enableCustomStationsInWorldRadios = true] to function)
             ]])
         end
 
