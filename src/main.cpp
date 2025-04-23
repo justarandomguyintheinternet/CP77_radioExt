@@ -1,3 +1,6 @@
+#define WIN32_LEAN_AND_MEAN 
+#define _CRT_SECURE_NO_WARNINGS
+#define CURL_STATICLIB
 #include <RED4ext/RED4ext.hpp>
 #include <RED4ext/RTTITypes.hpp>
 #include <RED4ext/Scripting/IScriptable.hpp>
@@ -7,12 +10,29 @@
 #include "SoundLoadData.hpp"
 #include <filesystem>
 #include <string>
+#include <WinSock2.h>
+#include <WS2tcpip.h>
 #include <Windows.h>
 #include <cstdio>
 #include <vector>
+#include <unordered_map>
+#include <mutex>
+#include <windows.h>
+#include <curl/curl.h>
+#include <thread>
+#include <chrono>
+#include <sstream>
+#include <fstream>
+
+#pragma comment(lib, "ws2_32.lib")
+#pragma comment(lib, "libcurl.lib")
 
 #define RADIOEXT_VERSION 0.7
 #define CHANNELS 256
+
+std::unordered_map<std::string, std::pair<int, std::shared_ptr<PROCESS_INFORMATION>>> activeRelays;
+std::mutex relayMutex;
+bool icecastStarted = false;
 
 const RED4ext::Sdk* sdk;
 RED4ext::PluginHandle handle;
@@ -375,6 +395,129 @@ void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aF
     aFrame->code++; // skip ParamEnd
 }
 
+std::string GetMountFromUrl(const std::string& url)
+{
+    size_t pos = url.find_last_of("/");
+    if (pos == std::string::npos || pos + 1 >= url.size()) {
+        return "/default"; // fallback mount
+    }
+    std::string mount = url.substr(pos + 1);
+    return "/" + mount;
+}
+
+std::filesystem::path GetModuleDirectory()
+{
+    char path[MAX_PATH];
+    HMODULE hModule = GetModuleHandleA("RadioExt.dll");
+    if (hModule && GetModuleFileNameA(hModule, path, MAX_PATH)) {
+        return std::filesystem::path(path).parent_path();
+    }
+    return std::filesystem::current_path();
+}
+
+bool RequiresRelay(const std::string& url) {
+    CURL* curl = curl_easy_init();
+    if (!curl) return true;
+
+    curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
+    curl_easy_setopt(curl, CURLOPT_NOBODY, 1L);
+    curl_easy_setopt(curl, CURLOPT_TIMEOUT, .5L);
+    curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
+
+    CURLcode res = curl_easy_perform(curl);
+    long http_version = 0;
+    curl_easy_getinfo(curl, CURLINFO_HTTP_VERSION, &http_version);
+    curl_easy_cleanup(curl);
+
+    if (res != CURLE_OK) return true;
+
+    return (http_version != CURL_HTTP_VERSION_1_0);
+}
+
+void StartIcecastIfNeeded()
+{
+    if (icecastStarted) {
+        return;
+    }
+
+    std::filesystem::path baseDir = GetModuleDirectory();
+    std::string exe = (baseDir / "icecast.exe").string();
+    std::string config = (baseDir / "icecast.xml").string();
+
+    if (!std::filesystem::exists(exe) || !std::filesystem::exists(config)) {
+        return;
+    }
+
+    std::string cmd = "\"" + exe + "\" -c \"" + config + "\"";
+
+    STARTUPINFOA si = { sizeof(si) };
+    PROCESS_INFORMATION pi;
+
+    BOOL result = CreateProcessA(nullptr, (LPSTR)cmd.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, baseDir.string().c_str(), &si, &pi);
+
+    if (result) {
+        CloseHandle(pi.hThread);
+        CloseHandle(pi.hProcess);
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        icecastStarted = true;
+    }
+    else {
+        DWORD err = GetLastError();
+    }
+}
+
+std::string ExtractStationNameFromUrl(const std::string& url) {
+    size_t lastSlash = url.find_last_of("/");
+    if (lastSlash == std::string::npos || lastSlash + 1 >= url.size()) {
+        return "stream";
+    }
+    std::string raw = url.substr(lastSlash + 1);
+    return raw.empty() ? "stream" : raw;
+}
+
+std::string StartRelay(const std::string& inputUrl)
+{
+    StartIcecastIfNeeded();
+
+    std::filesystem::path baseDir = GetModuleDirectory();
+    std::string mount = GetMountFromUrl(inputUrl);
+    std::string exe = (baseDir / "ffmpeg.exe").string();
+    std::lock_guard<std::mutex> lock(relayMutex);
+
+    auto it = activeRelays.find(mount);
+    if (it != activeRelays.end()) {
+        DWORD exitCode;
+        auto& procInfo = *it->second.second;
+        if (GetExitCodeProcess(procInfo.hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+            return "http://127.0.0.1:8000" + mount;
+        }
+        else {
+            TerminateProcess(procInfo.hProcess, 0);
+            CloseHandle(procInfo.hProcess);
+            CloseHandle(procInfo.hThread);
+            activeRelays.erase(it);
+        }
+    }
+
+    auto pi = std::make_shared<PROCESS_INFORMATION>();
+    STARTUPINFOA si = { sizeof(si) };
+
+    std::string cmd = "\"" + exe + "\" -loglevel error -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"" + inputUrl + "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"";
+
+    BOOL result = CreateProcessA(nullptr, (LPSTR)cmd.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, pi.get());
+
+    if (result) {
+        activeRelays[mount] = std::make_pair(8000, pi);
+        std::this_thread::sleep_for(std::chrono::seconds(2));
+        return "http://127.0.0.1:8000" + mount;
+    }
+    else {
+        DWORD err = GetLastError();
+    }
+
+    return "";
+}
+
 void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
@@ -396,9 +539,12 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
     std::filesystem::path target = root.parent_path() / subDir;
 
-    if (startPos == -1) // Is a stream
-    {
-        target = UTF8ToPath(std::string(path.c_str()));
+    std::string url = path.c_str();  // Copy early
+    if (startPos == -1) {
+        if (RequiresRelay(url)) {
+            url = StartRelay(url);
+        }
+        target = UTF8ToPath(url);
     }
 
     FMOD_MODE mode = FMOD_3D;
