@@ -1,4 +1,4 @@
-#define WIN32_LEAN_AND_MEAN 
+﻿#define WIN32_LEAN_AND_MEAN 
 #define _CRT_SECURE_NO_WARNINGS
 #define CURL_STATICLIB
 #include <RED4ext/RED4ext.hpp>
@@ -23,6 +23,7 @@
 #include <chrono>
 #include <sstream>
 #include <fstream>
+#include <nlohmann/json.hpp>
 
 #pragma comment(lib, "ws2_32.lib")
 #pragma comment(lib, "libcurl.lib")
@@ -401,8 +402,19 @@ std::string GetMountFromUrl(const std::string& url)
     if (pos == std::string::npos || pos + 1 >= url.size()) {
         return "/default"; // fallback mount
     }
-    std::string mount = url.substr(pos + 1);
-    return "/" + mount;
+    return "/" + url.substr(pos + 1);
+}
+
+std::filesystem::path GetGamePluginsDirectory()
+{
+    char path[MAX_PATH];
+    HMODULE hModule = GetModuleHandleA(nullptr);
+    if (hModule && GetModuleFileNameA(hModule, path, MAX_PATH)) {
+        auto fullPath = std::filesystem::path(path);
+        auto gameRoot = fullPath.parent_path().parent_path(); // bin/x64 → root
+        return gameRoot / "x64" / "plugins" / "cyber_engine_tweaks" / "mods" / "radioExt";
+    }
+    return std::filesystem::current_path();
 }
 
 std::filesystem::path GetModuleDirectory()
@@ -436,13 +448,11 @@ bool RequiresRelay(const std::string& url) {
 
 void StartIcecastIfNeeded()
 {
-    if (icecastStarted) {
-        return;
-    }
+    if (icecastStarted) return;
 
-    std::filesystem::path baseDir = GetModuleDirectory();
-    std::string exe = (baseDir / "icecast.exe").string();
-    std::string config = (baseDir / "icecast.xml").string();
+    auto baseDir = GetModuleDirectory();
+    auto exe = (baseDir / "icecast.exe").string();
+    auto config = (baseDir / "icecast.xml").string();
 
     if (!std::filesystem::exists(exe) || !std::filesystem::exists(config)) {
         return;
@@ -454,15 +464,11 @@ void StartIcecastIfNeeded()
     PROCESS_INFORMATION pi;
 
     BOOL result = CreateProcessA(nullptr, (LPSTR)cmd.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, baseDir.string().c_str(), &si, &pi);
-
     if (result) {
         CloseHandle(pi.hThread);
         CloseHandle(pi.hProcess);
         std::this_thread::sleep_for(std::chrono::seconds(2));
         icecastStarted = true;
-    }
-    else {
-        DWORD err = GetLastError();
     }
 }
 
@@ -488,15 +494,12 @@ std::string StartRelay(const std::string& inputUrl)
     if (it != activeRelays.end()) {
         DWORD exitCode;
         auto& procInfo = *it->second.second;
-        if (GetExitCodeProcess(procInfo.hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+        if (GetExitCodeProcess(procInfo.hProcess, &exitCode) && exitCode == STILL_ACTIVE)
             return "http://127.0.0.1:8000" + mount;
-        }
-        else {
-            TerminateProcess(procInfo.hProcess, 0);
-            CloseHandle(procInfo.hProcess);
-            CloseHandle(procInfo.hThread);
-            activeRelays.erase(it);
-        }
+        TerminateProcess(procInfo.hProcess, 0);
+        CloseHandle(procInfo.hProcess);
+        CloseHandle(procInfo.hThread);
+        activeRelays.erase(it);
     }
 
     auto pi = std::make_shared<PROCESS_INFORMATION>();
@@ -505,17 +508,60 @@ std::string StartRelay(const std::string& inputUrl)
     std::string cmd = "\"" + exe + "\" -loglevel error -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"" + inputUrl + "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"";
 
     BOOL result = CreateProcessA(nullptr, (LPSTR)cmd.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, pi.get());
-
     if (result) {
         activeRelays[mount] = std::make_pair(8000, pi);
         std::this_thread::sleep_for(std::chrono::seconds(2));
         return "http://127.0.0.1:8000" + mount;
     }
-    else {
-        DWORD err = GetLastError();
-    }
-
     return "";
+}
+
+std::vector<std::string> GetStreamURLsFromMetadata()
+{
+    std::vector<std::string> urls;
+    auto radioRoot = GetGamePluginsDirectory() / "radios";
+    for (auto& entry : std::filesystem::directory_iterator(radioRoot)) {
+        auto path = entry.path() / "metadata.json";
+        if (!std::filesystem::exists(path)) continue;
+
+        std::ifstream in(path);
+        try {
+            nlohmann::json j;
+            in >> j;
+            if (j.contains("streamInfo") && j["streamInfo"]["isStream"] == true) {
+                urls.push_back(j["streamInfo"]["streamURL"]);
+            }
+        }
+        catch (...) {
+        }
+    }
+    return urls;
+}
+
+void InitRelays() /// Used on launch because creating those dynamically leads to slight freezes
+{
+    StartIcecastIfNeeded();
+    std::thread([] {
+        for (const auto& url : GetStreamURLsFromMetadata()) {
+            if (RequiresRelay(url))
+            {
+                StartRelay(url);
+            }
+        }
+        }).detach();
+}
+
+void ShutdownRelays() /// Clearing out junk before exiting
+{
+    std::lock_guard<std::mutex> lock(relayMutex);
+    for (auto& [_, procPair] : activeRelays) {
+        auto& pi = *procPair.second;
+        TerminateProcess(pi.hProcess, 0);
+        CloseHandle(pi.hProcess);
+        CloseHandle(pi.hThread);
+    }
+    activeRelays.clear();
+    system("taskkill /IM icecast.exe /F");
 }
 
 void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
@@ -866,6 +912,7 @@ void WriteFileWrapper(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFra
 
 bool Running_OnEnter(RED4ext::CGameApplication* aApp)
 {
+    InitRelays();  // preload Icecast + all relays
     return true;
 }
 
@@ -878,6 +925,8 @@ bool Running_OnUpdate(RED4ext::CGameApplication* aApp)
 
 bool Running_OnExit(RED4ext::CGameApplication* aApp)
 {
+    ShutdownRelays();  // clean up FFmpeg/Icecast 
+
     for (int i = 0; i <= CHANNELS; i++)
     {
         if (pChannels[i])
