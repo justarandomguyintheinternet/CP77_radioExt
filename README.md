@@ -6,7 +6,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 - Have the latest version of the game installed
 - Download and install [CET](https://github.com/yamashi/CyberEngineTweaks), latest version
 - Download and install [Red4Ext](https://github.com/WopsS/RED4ext), latest version
-- Download and install the mod from [here](https://github.com/justarandomguyintheinternet/CP77_radioExt/releases)
+- Download and install the mod from releases page
 
 ## Creating a new station:
 
@@ -78,10 +78,25 @@ Not enough space on your game installation drive, or want to place the radio fol
 - A video tutorial can be found [here](https://www.youtube.com/watch?v=N8C8SaRypog) (WKit interface has changed a bit since the video has been made, so not everything shown there is at the same place anymore, but the general process is still the exact same)
 
 #### Web Streams
-- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`)
+- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`) and Youtube streams
 - Some examples can be found [here](https://truck-simulator.fandom.com/wiki/Radio_Stations#Radio_Stations_by_country), but also most stations from [here](https://radio.garden) can be used
 - `isStream`: This must be set to true for the mod to try to stream from the specified URL
 - `streamURL`: URL of the stream
+- For audio streams, FMOD only supports them if the response is HTTP/1.0. If the `streamURL` responds with HTTP/1.1+, local Icecast server and FFmpeg relay will be used
+- For Youtube streams, the combination of yt-dlp, FFmpeg and an Icecast server will be used
+- Icecast server and all relays for stations that require them will be started on game launch automatically
+- The pre-built mod release comes bundled with ffmpeg, icecast and yt-dlp. However, it is possible to provide your own executables instead. For this, you should:
+  1. Get [Icecast](https://icecast.org/download/) and install it anywhere
+  2. Copy contents from your installed `Icecast\bin` into `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast` and `Icecast\icecast.xml` into `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast`
+  3. Copy `Icecast\log` into `Cyberpunk 2077\red4ext\plugins\RadioExt`
+  4. Get [FFmpeg](https://ffmpeg.org/download.html) and [yt-dlp](https://github.com/yt-dlp/yt-dlp). We only need the ffmpeg.exe and yt-dlp.exe
+  5. You can either:
+     1. Install them as usual and and them to **PATH** 
+     2. Copy both executables into `Cyberpunk 2077\red4ext\plugins\RadioExt`
+    
+  6. Mod will look for executables in `Cyberpunk 2077\red4ext\plugins\RadioExt` first, and will try to get them from **PATH** if there are none. If any issues arise please revert to the provided binaries, or try to get the version on which the mod was tested: ffmpeg version `2025-04-17-git-7684243fbe-full_build-www.gyan.dev`, yt-dlp version `2025.03.31`
+- To post relays the default icecast server properties are used. The server should only be available locally, however, if you wish to additionally secure it, you'd have to change the logins and passwords in `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast\icecast.xml` and `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast_credentials.txt`
+
 
 #### Song Ordering
 - The `order` field can be used to specify an order in which the songs should be played
@@ -173,7 +188,19 @@ includeCustomStationsInRandom = true
 >`[RadioExt] Error: All channels used (Too many radios)`
 - This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 256, so this is extremely unlikely to ever happen)
 
+
 #### Credits
 - Uses [FMOD](https://www.fmod.com/) by Firelight Technologies
 - [psiberx](https://github.com/psiberx/cp2077-cet-kit) for Cron.lua, GameUI.lua and GameSettings.lua
 - [WSS](https://github.com/WSSDude420) for letting me use some of his C++ code
+
+## Licenses for Included Software
+
+This project bundles third-party executables:
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Unlicense / Public Domain
+- [FFmpeg](https://ffmpeg.org/) - LGPL 2.1+ Licensed
+- [Icecast](https://icecast.org/) - GPL 2.0 Licensed
+- [curl](https://curl.se/) (MIT/X curl license)
+
+See the LICENSES/ folder for details and license texts.
