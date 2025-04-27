@@ -434,6 +434,22 @@ std::string GetBinaryPath(const std::string& filename)
     return filename;
 }
 
+std::string FindExecutable(const std::string& name)
+{
+    std::string bundled = GetBinaryPath(name);
+    if (std::filesystem::exists(bundled)) {
+        return bundled;
+    }
+
+    char buffer[MAX_PATH];
+    if (SearchPathA(nullptr, name.c_str(), nullptr, MAX_PATH, buffer, nullptr) > 0) {
+        return std::string(buffer);
+    }
+
+    // This shouldn't happen ever if the user isn't trolling (no bundled exe and no trace in PATH)
+    return bundled;
+}
+
 bool RequiresRelay(const std::string& url) {
     CURL* curl = curl_easy_init();
     if (!curl) return true;
@@ -520,8 +536,8 @@ std::string StartRelay(const std::string& inputUrl)
         activeRelays.erase(it);
     }
 
-    std::string ytDlpPath = GetBinaryPath("yt-dlp.exe");
-    std::string ffmpegPath = GetBinaryPath("ffmpeg.exe");
+    std::string ytDlpPath = FindExecutable("yt-dlp.exe");
+    std::string ffmpegPath = FindExecutable("ffmpeg.exe");
     std::string relayUrl = "http://127.0.0.1:8000" + mount;
 
     std::string cmdLine;
