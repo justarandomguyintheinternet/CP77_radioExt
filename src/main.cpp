@@ -475,6 +475,29 @@ bool IsYouTubeUrl(const std::string& url)
     return url.find("youtube.com") != std::string::npos || url.find("youtu.be") != std::string::npos;
 }
 
+std::pair<std::string, std::string> GetIcecastCredentials()
+{
+    std::filesystem::path credFile = GetBinaryPath("icecast_credentials.txt");
+
+    if (std::filesystem::exists(credFile)) {
+        std::ifstream in(credFile);
+        std::string line;
+        if (std::getline(in, line)) {
+            size_t sep = line.find(':');
+            if (sep != std::string::npos) {
+                std::string username = line.substr(0, sep);
+                std::string password = line.substr(sep + 1);
+                if (!username.empty() && !password.empty()) {
+                    return { username, password };
+                }
+            }
+        }
+    }
+
+    // fallback
+    return { "source", "hackme" };
+}
+
 void StartIcecastIfNeeded()
 {
     if (icecastStarted) return;
@@ -536,6 +559,9 @@ std::string StartRelay(const std::string& inputUrl)
         activeRelays.erase(it);
     }
 
+    auto [icecastUser, icecastPass] = GetIcecastCredentials();
+    std::string icecastUrl = "icecast://" + icecastUser + ":" + icecastPass + "@127.0.0.1:8000" + mount;
+
     std::string ytDlpPath = FindExecutable("yt-dlp.exe");
     std::string ffmpegPath = FindExecutable("ffmpeg.exe");
     std::string relayUrl = "http://127.0.0.1:8000" + mount;
@@ -544,12 +570,12 @@ std::string StartRelay(const std::string& inputUrl)
     if (IsYouTubeUrl(inputUrl)) {
         cmdLine = "cmd.exe --% /s /C \"\"" + ytDlpPath +
             "\" -f 234 --downloader ffmpeg --downloader-args \"ffmpeg_i1:-extension_picky 0\" -o - \"" + inputUrl +
-            "\" | \"" + ffmpegPath + "\" -i pipe:0 -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"\"";
+            "\" | \"" + ffmpegPath + "\" -i pipe:0 -vn -c:a libmp3lame -b:a 256k -f mp3 \"" + icecastUrl + "\"\"";
     }
     else {
         cmdLine = "\"" + ffmpegPath +
             "\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"" + inputUrl +
-            "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"";
+            "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"" + icecastUrl + "\"";
     }
 
     auto pi = std::make_shared<PROCESS_INFORMATION>();
