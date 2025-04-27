@@ -54,13 +54,16 @@ function observersP.init(radioMod)
         this:TryInitializeInteractiveState()
     end)
 
-    Override("RadioControllerPS", "SetDefaultRadioStation", function (this)
-        if not this.radioSetup.randomizeStartingStation then
-            this.activeStation = this.radioSetup.startingStation
-            return
-        end
-        this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
-    end)
+    if SETTINGS.includeCustomStationsInRandom then
+        Override("RadioControllerPS", "SetDefaultRadioStation", function (this)
+            if not this.radioSetup.randomizeStartingStation then
+                this.activeStation = this.radioSetup.startingStation
+                return
+            end
+
+            this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
+        end)
+    end
 
     Observe("Radio", "PlayGivenStation", function (this)
         local active = this:GetDevicePS():GetActiveStationIndex()

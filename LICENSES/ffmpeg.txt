@@ -1,0 +1,8 @@
+FFmpeg License (LGPL 2.1+)
+
+This project includes the FFmpeg library, licensed under the GNU Lesser General Public License (LGPL) version 2.1 or later.
+
+You can obtain a copy of the FFmpeg source code from:
+https://ffmpeg.org/download.html
+
+Full LGPL-2.1 license text: https://www.gnu.org/licenses/old-licenses/lgpl-2.1.html

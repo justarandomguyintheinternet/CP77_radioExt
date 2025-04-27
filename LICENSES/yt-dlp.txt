@@ -1,0 +1,8 @@
+yt-dlp License (Unlicense/Public Domain)
+
+This project includes the yt-dlp tool, which is placed in the public domain via The Unlicense.
+
+Source code and further information are available at:
+https://github.com/yt-dlp/yt-dlp
+
+Full Unlicense text: https://unlicense.org/

@@ -1,4 +1,4 @@
-local Cron = require("modules/utils/Cron")
+	local Cron = require("modules/utils/Cron")
 local utils = require("modules/utils/utils")
 local audio = require("modules/utils/audioEngine")
 
@@ -53,29 +53,29 @@ function radio:verifyOrder() -- Verify all the songs for the order exist
     self.orderedSongs = ordered
 end
 
-function radio:setupRecord(metadata, path)
+function radio:setupRecord(metadata, index)
     if metadata.icon == "default" then
         self.icon = "UIIcon.RadioHipHop"
     else
         self.icon = metadata.icon
     end
 
-    path = tostring(path .. "_custom") -- In case someone names the station the same as a vanilla one
+    index = tostring(index .. "_custom") -- In case someone names the station the same as a vanilla one
 
-    self.tdbName = "RadioStation." .. path
+    self.tdbName = "RadioStation." .. index
 
-    TweakDB:CloneRecord("RadioStation." .. path, "RadioStation.Pop")
-    TweakDB:SetFlat("RadioStation." .. path .. ".displayName", self.name)
-    TweakDB:SetFlat("RadioStation." .. path .. ".icon", self.icon)
-    TweakDB:SetFlat("RadioStation." .. path .. ".index", self.index)
+    TweakDB:CloneRecord("RadioStation." .. index, "RadioStation.Pop")
+    TweakDB:SetFlat("RadioStation." .. index .. ".displayName", self.name)
+    TweakDB:SetFlat("RadioStation." .. index .. ".icon", self.icon)
+    TweakDB:SetFlat("RadioStation." .. index .. ".index", self.index)
     CName.add(self.name)
 
     if metadata.customIcon.useCustom then
-        TweakDB:CloneRecord("UIIcon." .. path, "UIIcon.ICEMinor")
-        TweakDB:SetFlat("UIIcon." .. path .. ".atlasResourcePath", metadata.customIcon.inkAtlasPath)
-        TweakDB:SetFlat("UIIcon." .. path .. ".atlasPartName", metadata.customIcon.inkAtlasPart)
-        TweakDB:SetFlat("RadioStation." .. path .. ".icon", "UIIcon." .. path)
-        self.icon = "UIIcon." .. path
+        TweakDB:CloneRecord("UIIcon." .. index, "UIIcon.ICEMinor")
+        TweakDB:SetFlat("UIIcon." .. index .. ".atlasResourcePath", metadata.customIcon.inkAtlasPath)
+        TweakDB:SetFlat("UIIcon." .. index .. ".atlasPartName", metadata.customIcon.inkAtlasPart)
+        TweakDB:SetFlat("RadioStation." .. index .. ".icon", "UIIcon." .. index)
+        self.icon = "UIIcon." .. index
     end
 end
 
@@ -91,7 +91,7 @@ function radio:load(metadata, lengthData, path, index) -- metadata is the data p
     self.path = path
     self.index = index + 13 -- Hardcoded 13 vanilla stations
 
-    self:setupRecord(metadata, path)
+    self:setupRecord(metadata, index)
     self:verifyOrder()
 
     if #self.songs == 0 and not self.metadata.streamInfo.isStream then -- Fallback for regular stations w/o any songs

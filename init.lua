@@ -8,6 +8,12 @@
 -------------------------------------------------------------------------------------------------------------------------------
 
 local minR4Version = 0.7
+local defaultSettings = {
+    enableCustomStationsInWorldRadios = true,
+    includeCustomStationsInRandom = false
+}
+
+SETTINGS = nil
 
 radio = {
     runtimeData = {
@@ -38,6 +44,59 @@ function radio:new()
             return
         end
 
+        local config = require("modules/utils/config")
+        local success = pcall(function ()
+            SETTINGS = config.loadFile("settings.json")
+        end)
+
+        if success and SETTINGS then
+            for k, _ in pairs(defaultSettings) do
+                if SETTINGS[k] == nil then
+                    success = false
+                    break
+                end
+            end
+        end
+
+        if not success or not SETTINGS then
+            print("[RadioExt] Warning: Failed to load the settings.json,use default settings")
+            SETTINGS = {}
+            for key, value in pairs(defaultSettings) do
+                SETTINGS[key] = value
+            end
+        end
+
+        if SETTINGS.enableCustomStationsInWorldRadios then
+            print([[
+[RadioExt] Warning: Custom stations are ENABLED on WORLD RADIOS (environmental devices).
+---------------------------------------------------------------
+- Saving with a world radio on custom stations causes PERMANENT MALFUNCTION after mod uninstall
+- Set [enableCustomStationsInWorldRadios = false] to prevent issues (won't fix existing ones)
+- Affected radios require MANUAL station cycling to recover functionality
+    ]])
+        end
+
+        if SETTINGS.includeCustomStationsInRandom then
+            print([[
+[RadioExt] Warning: Radios in the world will now randomly select custom stations.
+---------------------------------------------------------------
+- World radios may choose custom stations when first loaded. If randomized to custom stations:
+  State WILL BE PERMANENTLY SAVED (silent after mod uninstall)
+  Can affect multiple radios in save files without notice
+
+- Recovery: You MUST manually cycle stations on ALL affected radios
+
+- Critical Warning: 
+  Growl FM Party radio becomes UNFIXABLE 
+  (station switching physically blocked)
+
+- Essential precaution: 
+  Keep [includeCustomStationsInRandom = false] to avoid these risks
+
+* (This setting requires [enableCustomStationsInWorldRadios = true] to function)
+            ]])
+        end
+
         self.radioManager = require("modules/radioManager"):new(self)
         self.radioManager:init()
 
@@ -55,7 +114,9 @@ function radio:new()
         end)
 
         self.observersV.init(self)
-        self.observersP.init(self)
+        if SETTINGS.enableCustomStationsInWorldRadios then
+            self.observersP.init(self)
+        end
         self.runtimeData.ts = GetMod("trainSystem")
 
         self.runtimeData.inGame = not self.GameUI.IsDetached() -- Required to check if ingame after reloading all mods

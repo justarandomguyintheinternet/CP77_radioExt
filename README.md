@@ -6,7 +6,7 @@ A mod for CP2077 that allows for the addition of radio stations.
 - Have the latest version of the game installed
 - Download and install [CET](https://github.com/yamashi/CyberEngineTweaks), latest version
 - Download and install [Red4Ext](https://github.com/WopsS/RED4ext), latest version
-- Download and install the mod from [here](https://github.com/justarandomguyintheinternet/CP77_radioExt/releases)
+- Download and install the mod from releases page
 
 ## Creating a new station:
 
@@ -34,6 +34,20 @@ A mod for CP2077 that allows for the addition of radio stations.
 			└── folderForYourStation
 				└── metadata.json
 	```
+
+#### Using Symbolic Links
+Not enough space on your game installation drive, or want to place the radio folder somewhere else? No problem! You can put the radio folder wherever you like and then use a **symbolic link** to connect it to `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios`. The steps are simple:
+- Press **Windows+R**
+- Type `cmd` in the Run window
+- Press **Ctrl+Shift+Enter** to open the command prompt as an administrator
+- Enter the command `mklink /D [link] [target]` and press Enter to create the symbolic link. For example, if you want every directory under `D:\Music` to serve as a radio directory, and your game is installed at `E:\SteamLibrary\steamapps\common\Cyberpunk 2077`, then the command should be:  
+  `mklink /D "E:\SteamLibrary\steamapps\common\Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios" "D:\Music"`
+
+##### Note:
+- **Symbolic links are not shortcuts**; the mod does not support pointing the radio folder via shortcuts.
+- On Windows, symbolic links are supported only on the NTFS file system.
+- If you encounter compatibility issues, try deleting the symbolic link and moving the radio folder directly to its default location.
+- Generally, placing the radio folder on an HDD won’t noticeably affect performance, but if you have a large number of audio files or run into performance issues, consider moving the radio folder to an SSD.
 
 ### Adding Songs
 - To add songs to your station, simply copy the song files into your station's folder
@@ -64,10 +78,25 @@ A mod for CP2077 that allows for the addition of radio stations.
 - A video tutorial can be found [here](https://www.youtube.com/watch?v=N8C8SaRypog) (WKit interface has changed a bit since the video has been made, so not everything shown there is at the same place anymore, but the general process is still the exact same)
 
 #### Web Streams
-- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`)
+- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`) and Youtube streams
 - Some examples can be found [here](https://truck-simulator.fandom.com/wiki/Radio_Stations#Radio_Stations_by_country), but also most stations from [here](https://radio.garden) can be used
 - `isStream`: This must be set to true for the mod to try to stream from the specified URL
 - `streamURL`: URL of the stream
+- For audio streams, FMOD only supports them if the response is HTTP/1.0. If the `streamURL` responds with HTTP/1.1+, local Icecast server and FFmpeg relay will be used
+- For Youtube streams, the combination of yt-dlp, FFmpeg and an Icecast server will be used
+- Icecast server and all relays for stations that require them will be started on game launch automatically
+- The pre-built mod release comes bundled with ffmpeg, icecast and yt-dlp. However, it is possible to provide your own executables instead. For this, you should:
+  1. Get [Icecast](https://icecast.org/download/) and install it anywhere
+  2. Copy contents from your installed `Icecast\bin` into `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast` and `Icecast\icecast.xml` into `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast`
+  3. Copy `Icecast\log` into `Cyberpunk 2077\red4ext\plugins\RadioExt`
+  4. Get [FFmpeg](https://ffmpeg.org/download.html) and [yt-dlp](https://github.com/yt-dlp/yt-dlp). We only need the ffmpeg.exe and yt-dlp.exe
+  5. You can either:
+     1. Install them as usual and and them to **PATH** 
+     2. Copy both executables into `Cyberpunk 2077\red4ext\plugins\RadioExt`
+    
+  6. Mod will look for executables in `Cyberpunk 2077\red4ext\plugins\RadioExt` first, and will try to get them from **PATH** if there are none. If any issues arise please revert to the provided binaries, or try to get the version on which the mod was tested: ffmpeg version `2025-04-17-git-7684243fbe-full_build-www.gyan.dev`, yt-dlp version `2025.03.31`
+- To post relays the default icecast server properties are used. The server should only be available locally, however, if you wish to additionally secure it, you'd have to change the logins and passwords in `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast\icecast.xml` and `Cyberpunk 2077\red4ext\plugins\RadioExt\icecast_credentials.txt`
+
 
 #### Song Ordering
 - The `order` field can be used to specify an order in which the songs should be played
@@ -81,6 +110,64 @@ A mod for CP2077 that allows for the addition of radio stations.
 ]
 ```
 
+## Configuration Options
+- Mod configuration file location:  
+  `Cyberpunk 2077\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt`
+
+> `enableCustomStationsInWorldRadios`
+- **Boolean** (`true`/`false`)  
+  When `true`: Custom stations become available on **world radios** (environmental radio devices).  
+  When `false`: Custom stations only work on **vehicle radios**/player's portable radio.  
+  Default: `true`
+
+> `includeCustomStationsInRandom`
+- **Boolean** (`true`/`false`)  
+  When `true`: World radios will **randomize to custom stations**.  
+  When `false`: World radios only cycle through **vanilla stations**.  
+  Default: `false`  
+  **⚠️ Warning:** Only enable this if you fully understand the implications. See important notes below.
+
+## ⚠️ Important Notes
+
+### Save File Safety
+- **World radio modifications are PERSISTENT**  
+  If you save the game with a world radio tuned to custom stations:
+  - Radio will become **silent** after mod uninstallation
+  - Recovery requires **manual intervention**
+
+### 🔴 Critical Exceptions
+- **Growl FM Party Radio Corruption**  
+  Visiting the "Growl FM Party" scene with both settings enabled：
+  ```
+  includeCustomStationsInRandom = true
+  enableCustomStationsInWorldRadios = true
+  ```
+  
+  **Permanent consequences:**
+  - Radio stuck on incorrect station (can't switch)
+  - Original Growl FM content fails to play
+  - No recovery through normal gameplay
+
+### Recovery Options
+1. **Before uninstalling**:  
+   Tune all modified world radios back to **vanilla stations**
+2. **After uninstalling**:  
+   Cycle station once on affected radios to restore functionality
+
+### Critical Limitations
+- 🔴 `enableCustomStationsInWorldRadios = false` **WILL NOT**  
+  - Fix existing modified radios in save files  
+  - Remove custom station assignments  
+  *Manual reset is always required*
+
+### Safety Lock Mechanism
+World radios **will NEVER auto-randomize** to custom stations unless:
+```lua
+-- Both conditions must be true
+enableCustomStationsInWorldRadios = true
+includeCustomStationsInRandom = true
+```
+
 ## Troubleshooting
 - If anything does not work as expected, firstly make sure that all the points of the [How to use](#how-to-use) section are fulfilled, and the required mods are working properly
 - The mod prints messages to the CET console for most of the common issues, so open the CET console and look for any `"[RadioExt] Error/Warning: ..."` messages
@@ -92,14 +179,28 @@ A mod for CP2077 that allows for the addition of radio stations.
  - This means that you forgot to add the `metadata.json file` (See [Folder Structure](#folder-structure) section)
 > `[RadioExt] Error: Failed to load the metadata.json file for "stationFolderName". Make sure the file is valid.`
 - This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
+> `[RadioExt] Warning: Failed to load the settings.json,use default settings.`
+- This means the `settings.json` file is corrupted / not valid / lacks essential configuration entries. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
 > `"[RadioExt] Warning: The file "songFile.mp3" requested for the ordering of station "Station Name" was not found."`
 - Make sure the file you specified in the `order` field does exist and that its filename is spelled properly
 >`"[RadioExt] Error: Station "Station Name" is not a stream, but also has no song files. Using fallback webstream instead."`
 - This happens if there are no song files in a station's folder, but the `isStream` flag in its `metadata.json` file is also not set to `true`
 >`[RadioExt] Error: All channels used (Too many radios)`
-- This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 64, so this is extremely unlikely to ever happen)
+- This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 256, so this is extremely unlikely to ever happen)
+
 
 #### Credits
 - Uses [FMOD](https://www.fmod.com/) by Firelight Technologies
 - [psiberx](https://github.com/psiberx/cp2077-cet-kit) for Cron.lua, GameUI.lua and GameSettings.lua
 - [WSS](https://github.com/WSSDude420) for letting me use some of his C++ code
+
+## Licenses for Included Software
+
+This project bundles third-party executables:
+
+- [yt-dlp](https://github.com/yt-dlp/yt-dlp) - Unlicense / Public Domain
+- [FFmpeg](https://ffmpeg.org/) - LGPL 2.1+ Licensed
+- [Icecast](https://icecast.org/) - GPL 2.0 Licensed
+- [curl](https://curl.se/) (MIT/X curl license)
+
+See the LICENSES/ folder for details and license texts.
