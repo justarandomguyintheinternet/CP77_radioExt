@@ -1,0 +1,8 @@
+Icecast License (GNU GPL v2.0 or later)
+
+This project includes the Icecast streaming server, licensed under the GNU General Public License, version 2.0 or later.
+
+You can obtain a copy of the Icecast source code from:
+https://icecast.org/
+
+Full GPL-2.0 license text: https://www.gnu.org/licenses/old-licenses/gpl-2.0.html
