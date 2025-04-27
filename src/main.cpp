@@ -32,6 +32,7 @@
 #define CHANNELS 256
 
 std::unordered_map<std::string, std::pair<int, std::shared_ptr<PROCESS_INFORMATION>>> activeRelays;
+std::unordered_map<std::string, std::string> relayUrlCache; // original URL -> relay URL
 std::mutex relayMutex;
 bool icecastStarted = false;
 
@@ -42,7 +43,6 @@ FMOD::System* pSystem;
 FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
 SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
 
-// Convert a UTF-8 encoded std::string to a wide string
 std::wstring UTF8ToWide(const std::string& utf8)
 {
     if (utf8.empty())
@@ -57,7 +57,6 @@ std::wstring UTF8ToWide(const std::string& utf8)
     return wstr;
 }
 
-// Convert a wide string to a UTF-8 encoded std::string
 std::string WideToUTF8(const std::wstring& wstr)
 {
     if (wstr.empty())
@@ -72,13 +71,11 @@ std::string WideToUTF8(const std::wstring& wstr)
     return str;
 }
 
-// Convert a Windows std::filesystem::path (using wide characters internally) to a UTF-8 encoded std::string
 std::string toUTF8(const std::filesystem::path& path)
 {
     return WideToUTF8(path.wstring());
 }
 
-// Convert a UTF-8 encoded string to a std::filesystem::path (constructed with wide characters)
 std::filesystem::path UTF8ToPath(const std::string& utf8)
 {
     return std::filesystem::path(UTF8ToWide(utf8));
@@ -427,6 +424,16 @@ std::filesystem::path GetModuleDirectory()
     return std::filesystem::current_path();
 }
 
+std::string GetBinaryPath(const std::string& filename)
+{
+    char path[MAX_PATH];
+    HMODULE hModule = GetModuleHandleA("RadioExt.dll");
+    if (hModule && GetModuleFileNameA(hModule, path, MAX_PATH)) {
+        return (std::filesystem::path(path).parent_path() / filename).string();
+    }
+    return filename;
+}
+
 bool RequiresRelay(const std::string& url) {
     CURL* curl = curl_easy_init();
     if (!curl) return true;
@@ -446,13 +453,19 @@ bool RequiresRelay(const std::string& url) {
     return (http_version != CURL_HTTP_VERSION_1_0);
 }
 
+
+bool IsYouTubeUrl(const std::string& url)
+{
+    return url.find("youtube.com") != std::string::npos || url.find("youtu.be") != std::string::npos;
+}
+
 void StartIcecastIfNeeded()
 {
     if (icecastStarted) return;
 
     auto baseDir = GetModuleDirectory();
-    auto exe = (baseDir / "icecast.exe").string();
-    auto config = (baseDir / "icecast.xml").string();
+    auto exe = (baseDir / "icecast" / "icecast.exe").string();
+    auto config = (baseDir / "icecast" / "icecast.xml").string();
 
     if (!std::filesystem::exists(exe) || !std::filesystem::exists(config)) {
         return;
@@ -481,37 +494,56 @@ std::string ExtractStationNameFromUrl(const std::string& url) {
     return raw.empty() ? "stream" : raw;
 }
 
+
 std::string StartRelay(const std::string& inputUrl)
 {
     StartIcecastIfNeeded();
-
-    std::filesystem::path baseDir = GetModuleDirectory();
     std::string mount = GetMountFromUrl(inputUrl);
-    std::string exe = (baseDir / "ffmpeg.exe").string();
     std::lock_guard<std::mutex> lock(relayMutex);
+
+    if (relayUrlCache.contains(inputUrl)) {
+        return relayUrlCache[inputUrl];
+    }
 
     auto it = activeRelays.find(mount);
     if (it != activeRelays.end()) {
         DWORD exitCode;
         auto& procInfo = *it->second.second;
-        if (GetExitCodeProcess(procInfo.hProcess, &exitCode) && exitCode == STILL_ACTIVE)
-            return "http://127.0.0.1:8000" + mount;
+        if (GetExitCodeProcess(procInfo.hProcess, &exitCode) && exitCode == STILL_ACTIVE) {
+            std::string result = "http://127.0.0.1:8000" + mount;
+            relayUrlCache[inputUrl] = result;
+            return result;
+        }
         TerminateProcess(procInfo.hProcess, 0);
         CloseHandle(procInfo.hProcess);
         CloseHandle(procInfo.hThread);
         activeRelays.erase(it);
     }
 
+    std::string ytDlpPath = GetBinaryPath("yt-dlp.exe");
+    std::string ffmpegPath = GetBinaryPath("ffmpeg.exe");
+    std::string relayUrl = "http://127.0.0.1:8000" + mount;
+
+    std::string cmdLine;
+    if (IsYouTubeUrl(inputUrl)) {
+        cmdLine = "cmd.exe --% /s /C \"\"" + ytDlpPath +
+            "\" -f 234 --downloader ffmpeg --downloader-args \"ffmpeg_i1:-extension_picky 0\" -o - \"" + inputUrl +
+            "\" | \"" + ffmpegPath + "\" -i pipe:0 -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"\"";
+    }
+    else {
+        cmdLine = "\"" + ffmpegPath +
+            "\" -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"" + inputUrl +
+            "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"";
+    }
+
     auto pi = std::make_shared<PROCESS_INFORMATION>();
     STARTUPINFOA si = { sizeof(si) };
 
-    std::string cmd = "\"" + exe + "\" -loglevel error -reconnect 1 -reconnect_streamed 1 -reconnect_delay_max 5 -i \"" + inputUrl + "\" -vn -c:a libmp3lame -b:a 256k -f mp3 \"icecast://source:hackme@127.0.0.1:8000" + mount + "\"";
-
-    BOOL result = CreateProcessA(nullptr, (LPSTR)cmd.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, pi.get());
+    BOOL result = CreateProcessA(nullptr, (LPSTR)cmdLine.c_str(), nullptr, nullptr, FALSE, CREATE_NO_WINDOW, nullptr, nullptr, &si, pi.get());
     if (result) {
         activeRelays[mount] = std::make_pair(8000, pi);
-        std::this_thread::sleep_for(std::chrono::seconds(2));
-        return "http://127.0.0.1:8000" + mount;
+        relayUrlCache[inputUrl] = relayUrl;
+        return relayUrl;
     }
     return "";
 }
@@ -585,12 +617,15 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     std::filesystem::path subDir = UTF8ToPath(std::string(path.c_str()));
     std::filesystem::path target = root.parent_path() / subDir;
 
-    std::string url = path.c_str();  // Copy early
+    std::string url = path.c_str();
     if (startPos == -1) {
-        if (RequiresRelay(url)) {
-            url = StartRelay(url);
+        auto it = relayUrlCache.find(url);
+        if (it != relayUrlCache.end()) {
+            target = UTF8ToPath(it->second);
         }
-        target = UTF8ToPath(url);
+        else {
+            target = UTF8ToPath(url);
+        }
     }
 
     FMOD_MODE mode = FMOD_3D;
