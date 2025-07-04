@@ -30,7 +30,7 @@ jobs:
           xcopy red4ext\RadioExt.dll \packed\red4ext\plugins\RadioExt /e
           xcopy red4ext\fmod.dll \packed\red4ext\plugins\RadioExt /e
       - name: Upload zip
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
             name: radioExtLatest
             path: \packed\
