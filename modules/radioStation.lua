@@ -81,7 +81,7 @@ end
 
 function radio:load(metadata, lengthData, path, index) -- metadata is the data provided by the user, lengthData is the length of all songs
     for k, v in pairs(lengthData) do
-        table.insert(self.songs, {path = k, length = v})
+        table.insert(self.songs, { path = k, length = v })
     end
 
     self.name = metadata.displayName
@@ -94,16 +94,14 @@ function radio:load(metadata, lengthData, path, index) -- metadata is the data p
     self:setupRecord(metadata, path)
     self:verifyOrder()
 
-    if #self.songs == 0 and not self.metadata.streamInfo.isStream then -- Fallback for regular stations w/o any songs
-        print("[RadioExt] Error: Station \"" .. self.name .. "\" is not a stream, but also has no song files. Using fallback webstream instead.")
-        self.metadata.streamInfo.isStream = true
-        self.metadata.streamInfo.streamURL = "https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3"
+    if #self.songs == 0 and not self.metadata.streamInfo.isStream then
+        print("[RadioExt] Error: Station \"" .. self.name .. "\" is not a stream, but also has no song files.")
     end
 
     if not self.metadata.streamInfo.isStream then
         self:startRadioSimulation()
     else
-        self.currentSong = {path = self.name, length = 0} -- Used for the "playing now" HUD element
+        self.currentSong = { path = self.name, length = 0 } -- Used for the "playing now" HUD element
     end
 
     for i = -1, RadioExt.GetNumChannels() do -- -1 is vehicle radio, 1 - CHANNELS is physical channels
@@ -117,6 +115,7 @@ function radio:startRadioSimulation()
     self.tick = math.random(self.currentSong.length - 15)
     table.remove(self.shuffelBag, 1)
 
+    -- TODO: Make this less stupid and more accurate, currently up to a second off, causing error on cpp side due to channel being invalid / ended
     self.simCron = Cron.Every(1, function ()
         if self.tick >= self.currentSong.length then
             self:currentSongDone()
@@ -124,10 +123,9 @@ function radio:startRadioSimulation()
 
             self.currentSong = self.shuffelBag[1]
             table.remove(self.shuffelBag, 1)
+            self.tick = 0
 
             self:startNewSong()
-
-            self.tick = 0
         else
             self.tick = self.tick + 1
         end

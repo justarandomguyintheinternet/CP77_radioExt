@@ -6,7 +6,7 @@
 #include <fmod_errors.h>
 #include "SoundLoadData.hpp"
 
-#define RADIOEXT_VERSION 0.8
+#define RADIOEXT_VERSION "0.9.0"
 #define CHANNELS 256
 
 const RED4ext::Sdk* sdk;
@@ -17,7 +17,8 @@ FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle r
 SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
 
 // General purpose functions
-void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::CString* aOut,
+                        int64_t a4);
 void GetNumChannels(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, int32_t* aOut, int64_t a4);
 void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::DynArray<RED4ext::CString>* aOut, int64_t a4);
 void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, int32_t* aOut, int64_t a4);
@@ -90,7 +91,7 @@ void registerGeneralFunctions(RED4ext::CRTTISystem* rtti)
     getLength->SetReturnType("Int32");
 
     auto getVersion = RED4ext::CClassStaticFunction::Create(&cls, "GetVersion", "GetVersion", &GetRadioExtVersion, {.isNative = true, .isStatic = true});
-    getVersion->SetReturnType("Float");
+    getVersion->SetReturnType("String");
 
     auto getChannels = RED4ext::CClassStaticFunction::Create(&cls, "GetNumChannels", "GetNumChannels", &GetNumChannels, { .isNative = true, .isStatic = true });
     getChannels->SetReturnType("Int32");
@@ -243,15 +244,16 @@ void GetNumChannels(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame
     aFrame->code++; // skip ParamEnd
 }
 
-void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::CString* aOut,
+                        int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
 
-    float version = RADIOEXT_VERSION;
+    RED4ext::CString version = RADIOEXT_VERSION;
     if (aOut)
     {
-        auto type = RED4ext::CRTTISystem::Get()->GetType("Float");
+        auto type = RED4ext::CRTTISystem::Get()->GetType("String");
         type->Assign(aOut, &version);
     }
 
@@ -274,6 +276,12 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &volume);
     RED4ext::GetParameter(aFrame, &fade);
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
+
+    if (loadData[channelID]->play == true)
+    {
+        aFrame->code++; // skip ParamEnd
+        return;
+    }
 
     std::filesystem::path subDir = path.c_str();
     std::filesystem::path target = root.parent_path() / subDir;
@@ -513,6 +521,7 @@ void checkSoundLoad()
 
             setFadeIn(pSystem, pChannels[i], loadData[i]->fade);
         } else if(state == FMOD_OPENSTATE_ERROR) {
+            // Todo: remember, and do not try again
             sdk->logger->ErrorF(handle, "Failed to load sound for channel %i", i);
             loadData[i]->play = false;
         }

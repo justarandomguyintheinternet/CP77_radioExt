@@ -57,11 +57,11 @@ function observersV.init(radioMod)
 
             if GetLocalizedText(v.record:DisplayName()) == "Enable Aux Radio" then fm = 0 end
 
-            sorted[#sorted + 1] = {data = v, fm = fm}
+            sorted[#sorted + 1] = { data = v, fm = fm }
         end
 
         for _, radio in pairs(observersV.radioMod.radioManager.radios) do -- Add custom radios
-            sorted[#sorted + 1] = {data = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord(radio.tdbName)}), fm = tonumber(radio.fm)}
+            sorted[#sorted + 1] = { data = RadioListItemData.new({ record = TweakDBInterface.GetRadioStationRecord(radio.tdbName) }), fm = tonumber(radio.fm)}
         end
 
         table.sort(sorted, function (a, b) -- Sort
@@ -69,7 +69,7 @@ function observersV.init(radioMod)
         end)
 
         local stations = {}
-        stations[1] = RadioListItemData.new({record = TweakDBInterface.GetRadioStationRecord("RadioStation.NoStation")}) -- Add NoStation
+        stations[1] = RadioListItemData.new({ record = TweakDBInterface.GetRadioStationRecord("RadioStation.NoStation") }) -- Add NoStation
 
         for _, v in pairs(sorted) do -- Get rid of nested table structure
             table.insert(stations, v.data)
@@ -83,10 +83,10 @@ function observersV.init(radioMod)
         radioMod.logger.log("QuickSlotsManager::SendRadioEvent")
         if station > 13 then
             if GetMountedVehicle(GetPlayer()) then
-                this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({toggle = false, setStation = false, station = -1})) -- Goes to the vehicle radio if there is any, disabling it
+                this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({ toggle = false, setStation = false, station = -1 })) -- Goes to the vehicle radio if there is any, disabling it
             end
             if not GetMountedVehicle(GetPlayer()) or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
-                this.Player:QueueEvent(VehicleRadioEvent.new({toggle = toggle, setStation = setStation, station = station})) -- Goes to PocketRadio::HandleVehicleRadioEvent
+                this.Player:QueueEvent(VehicleRadioEvent.new({ toggle = toggle, setStation = setStation, station = station })) -- Goes to PocketRadio::HandleVehicleRadioEvent
             end
 
             Cron.After(0.1, function ()

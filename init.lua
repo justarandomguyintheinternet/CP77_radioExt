@@ -7,7 +7,7 @@
 --    * You may not fork this code and make your own competing version of this mod available for download without my permission.
 -------------------------------------------------------------------------------------------------------------------------------
 
-local minR4Version = 0.8
+local minR4Version = "0.9.0"
 
 radio = {
     runtimeData = {
@@ -21,8 +21,7 @@ radio = {
     Cron = require("modules/utils/Cron"),
     observersV = require("modules/vehicle/observersV"),
     observersP = require("modules/physical/observersP"),
-    logger = require("modules/utils/logger"),
-    version = 2.7
+    logger = require("modules/utils/logger")
 }
 
 function radio:new()
@@ -33,7 +32,7 @@ function radio:new()
             print("[RadioExt] Error: Red4Ext part of the mod is missing")
             return
         end
-        if math.abs(RadioExt.GetVersion() - minR4Version) > 0.05 then
+        if tostring(RadioExt.GetVersion()) < minR4Version then
             print("[RadioExt] Red4Ext Part version mismatch: Version is " .. RadioExt.GetVersion() .. " Expected: " .. minR4Version .. " or newer")
             return
         end

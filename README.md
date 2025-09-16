@@ -64,8 +64,8 @@ A mod for CP2077 that allows for the addition of radio stations.
 - A video tutorial can be found [here](https://www.youtube.com/watch?v=N8C8SaRypog) (WKit interface has changed a bit since the video has been made, so not everything shown there is at the same place anymore, but the general process is still the exact same)
 
 #### Web Streams
-- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://radio.garden/api/ara/content/listen/TP8NDBv7/channel.mp3`)
-- Some examples can be found [here](https://truck-simulator.fandom.com/wiki/Radio_Stations#Radio_Stations_by_country), but also most stations from [here](https://radio.garden) can be used
+- Instead of using song files placed in the station's folder, you can also use any web audio streams (URL's that end in e.g. `.mp3`, and display the default audio player when opened, e.g. `https://stream.antiradio.net/radio/8000/mp3`)
+- Some examples can be found [here](https://truck-simulator.fandom.com/wiki/Radio_Stations#Radio_Stations_by_country)
 - `isStream`: This must be set to true for the mod to try to stream from the specified URL
 - `streamURL`: URL of the stream
 

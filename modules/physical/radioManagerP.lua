@@ -61,6 +61,8 @@ function managerP:update()
 		object:update()
 	end
 
+	if #self.radioObjects == 0 then return end
+
 	Game.GetCameraSystem():GetActiveCameraWorldTransform(self.cameraTransform)
 	RadioExt.SetListener(self.cameraTransform.position, GetPlayer():GetWorldForward(), GetPlayer():GetWorldUp())
 end
