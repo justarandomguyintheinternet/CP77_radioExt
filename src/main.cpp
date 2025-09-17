@@ -4,10 +4,12 @@
 #include <RED4ext/Scripting/Natives/Generated/Vector4.hpp>
 #include <fmod.hpp>
 #include <fmod_errors.h>
+#include <unordered_map>
 #include "SoundLoadData.hpp"
 
 #define RADIOEXT_VERSION "0.9.0"
-#define CHANNELS 256
+#define CHANNELS 64
+#define MAX_LOAD_ATTEMPTS 3
 
 const RED4ext::Sdk* sdk;
 RED4ext::PluginHandle handle;
@@ -15,6 +17,7 @@ std::filesystem::path root;
 FMOD::System* pSystem;
 FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
 SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
+std::unordered_map<std::string, uint32_t> failedConnections;
 
 // General purpose functions
 void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RED4ext::CString* aOut,
@@ -291,6 +294,15 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
         target = subDir;
     }
 
+    if (failedConnections.contains(target.string()))
+    {
+        if (failedConnections[target.string()] >= MAX_LOAD_ATTEMPTS)
+        {
+            sdk->logger->ErrorF(handle, "Resource %s has exceeded maximum amount of load attempts.", target.string().c_str());
+            return;
+        }
+    }
+
     FMOD_MODE mode = FMOD_3D;
     if (channelID == -1)
     {
@@ -310,7 +322,7 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     loadData[channelID]->startPos = startPos;
     loadData[channelID]->volume = volume;
     loadData[channelID]->play = true; // Sound is loading, check if loading has finished
-
+    loadData[channelID]->path = target.string();
     aFrame->code++; // skip ParamEnd
 }
 
@@ -521,9 +533,18 @@ void checkSoundLoad()
 
             setFadeIn(pSystem, pChannels[i], loadData[i]->fade);
         } else if(state == FMOD_OPENSTATE_ERROR) {
-            // Todo: remember, and do not try again
-            sdk->logger->ErrorF(handle, "Failed to load sound for channel %i", i);
-            loadData[i]->play = false;
+            if (failedConnections.contains(loadData[i]->path))
+            {
+                failedConnections[loadData[i]->path]++;
+            }
+            else
+            {
+                failedConnections[loadData[i]->path] = 1;
+            }
+
+            sdk->logger->ErrorF(
+                handle, "Failed to load sound for channel %i. This has been attempt number %i for that resource.", i,
+                failedConnections[loadData[i]->path]);
         }
     }
 }

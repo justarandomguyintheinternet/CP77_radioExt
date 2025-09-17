@@ -4,4 +4,5 @@ struct SoundLoadData {
     float volume;
     float fade;
     bool play;
+    std::string path;
 };
