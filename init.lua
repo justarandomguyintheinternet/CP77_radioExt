@@ -8,8 +8,10 @@
 -------------------------------------------------------------------------------------------------------------------------------
 
 local minR4Version = "0.9.0"
+local initializationError = true
+local audio = require("modules/utils/audioEngine")
 
-radio = {
+local radio = {
     runtimeData = {
         inMenu = false,
         inGame = false,
@@ -58,6 +60,8 @@ function radio:new()
         self.runtimeData.ts = GetMod("trainSystem")
 
         self.runtimeData.inGame = not self.GameUI.IsDetached() -- Required to check if ingame after reloading all mods
+
+        initializationError = false
     end)
 
     registerForEvent("onShutdown", function()
@@ -65,11 +69,14 @@ function radio:new()
     end)
 
     registerForEvent("onUpdate", function(delta)
+        if initializationError then return end
+
         if (not self.runtimeData.inMenu) and self.runtimeData.inGame then
             self.Cron.Update(delta)
             self.radioManager:update()
             self.radioManager.managerV:handleTS()
             self.logger.update()
+            audio.update(delta)
         else
             self.radioManager:handleMenu()
         end

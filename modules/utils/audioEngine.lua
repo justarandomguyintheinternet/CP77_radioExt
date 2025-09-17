@@ -1,6 +1,10 @@
 local GameSettings = require("modules/utils/GameSettings")
 
-local audio = {}
+local maxRequestInterval = 0.75
+
+local audio = {
+    timeSinceLastPlayed = maxRequestInterval + 1
+}
 
 local function getAdjustedVolume(channel, volume)
     local mult = GameSettings.Get("/audio/volume/RadioportVolume")
@@ -15,7 +19,16 @@ local function getAdjustedVolume(channel, volume)
     return volume * 0.4
 end
 
+function audio.update(deltaTime)
+    audio.timeSinceLastPlayed = audio.timeSinceLastPlayed + deltaTime
+end
+
 function audio.playFile(id, path, time, volume, fade)
+    if audio.timeSinceLastPlayed < maxRequestInterval then
+        return
+    end
+
+    audio.timeSinceLastPlayed = 0
     fade = fade or 0.75
     RadioExt.Play(id, path, time, getAdjustedVolume(id, volume), fade)
 end
