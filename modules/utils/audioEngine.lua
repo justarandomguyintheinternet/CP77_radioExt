@@ -1,6 +1,6 @@
 local GameSettings = require("modules/utils/GameSettings")
 
-local maxRequestInterval = 0.75
+local maxRequestInterval = 1.0
 
 local audio = {
     timeSinceLastPlayed = maxRequestInterval + 1
