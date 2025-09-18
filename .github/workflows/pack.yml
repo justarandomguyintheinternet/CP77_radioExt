@@ -34,3 +34,4 @@ jobs:
         with:
             name: radioExtLatest
             path: \packed\
+            include-hidden-files: true
