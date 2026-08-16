@@ -4,3 +4,5 @@
 *.log
 *.mp3
 *.json
+\build
+*.zip

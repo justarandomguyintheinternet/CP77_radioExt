@@ -6,7 +6,7 @@ function config.fileExists(filename)
 end
 
 function config.tryCreateConfig(path, data)
-	if not config.fileExists(path) then
+        if not config.fileExists(path) then
         local file = io.open(path, "w")
         local jconfig = json.encode(data)
         file:write(jconfig)
@@ -16,16 +16,34 @@ end
 
 function config.loadFile(path)
     local file = io.open(path, "r")
-    local config = json.decode(file:read("*a"))
+    if not file then
+        return nil
+    end
+    local content = file:read("*a")
     file:close()
-    return config
+    if not content or content == "" then
+        return nil
+    end
+    local ok, decoded = pcall(json.decode, content)
+    if not ok or decoded == nil then
+        return nil
+    end
+    return decoded
 end
 
 function config.saveFile(path, data)
     local file = io.open(path, "w")
-    local jconfig = json.encode(data)
+    if not file then
+        return false
+    end
+    local ok, jconfig = pcall(json.encode, data)
+    if not ok then
+        file:close()
+        return false
+    end
     file:write(jconfig)
     file:close()
+    return true
 end
 
 function config.backwardComp(path, data)

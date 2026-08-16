@@ -61,7 +61,11 @@ function managerP:update()
 		object:update()
 	end
 
-	if #self.radioObjects == 0 then return end
+	-- `#` on a table with integer-key gaps is undefined behavior in Lua.
+	-- When physical radios are removed mid-session (e.g. via TurnOffDevice),
+	-- gaps appear and `#self.radioObjects` can report 0 even when objects
+	-- remain (or vice-versa). Use `next()` for a reliable emptiness test.
+	if next(self.radioObjects) == nil then return end
 
 	Game.GetCameraSystem():GetActiveCameraWorldTransform(self.cameraTransform)
 	RadioExt.SetListener(self.cameraTransform.position, GetPlayer():GetWorldForward(), GetPlayer():GetWorldUp())

@@ -1,11 +1,11 @@
-miscUtils = {}
+local miscUtils = {}
 
 function miscUtils.isSameInstance(a, b)
-	return Game['OperatorEqual;IScriptableIScriptable;Bool'](a, b)
+        return Game['OperatorEqual;IScriptableIScriptable;Bool'](a, b)
 end
 
 function miscUtils.deepcopy(origin)
-	local orig_type = type(origin)
+        local orig_type = type(origin)
     local copy
     if orig_type == 'table' then
         copy = {}
@@ -40,19 +40,25 @@ end
 function miscUtils.getIndex(tab, val)
     local index = nil
     for i, v in ipairs(tab) do
-		if v == val then
-			index = i
-		end
+                if v == val then
+                        index = i
+                        break
+                end
     end
     return index
 end
 
 function miscUtils.removeItem(tab, val)
-    table.remove(tab, miscUtils.getIndex(tab, val))
+    -- If the value isn't present, do nothing.
+    -- Previously this called table.remove(tab, nil) which silently removes
+    -- the LAST element of the table, corrupting station playlists.
+    local index = miscUtils.getIndex(tab, val)
+    if index == nil then return end
+    table.remove(tab, index)
 end
 
 function miscUtils.split(s, delimiter) --https://www.codegrepper.com/code-examples/lua/lua+split+string+by+space
-    result = {};
+    local result = {};
     for match in (s..delimiter):gmatch("(.-)"..delimiter) do
         table.insert(result, match);
     end

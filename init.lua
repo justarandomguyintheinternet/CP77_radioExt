@@ -11,6 +11,33 @@ local minR4Version = "0.9.0"
 local initializationError = true
 local audio = require("modules/utils/audioEngine")
 
+-- Compares two dotted version strings (e.g. "0.9.0" vs "0.10.2").
+-- Returns true if `actual` is greater than or equal to `required`.
+-- Replaces the previous lexicographic compare which considered
+-- "0.10.0" < "0.9.0" (because '1' < '9' byte-by-byte) and blocked
+-- valid newer builds.
+local function versionGte(actual, required)
+    if actual == nil then return false end
+    actual = tostring(actual)
+    local function parse(v)
+        local parts = {}
+        for n in v:gmatch("(%d+)") do
+            table.insert(parts, tonumber(n) or 0)
+        end
+        return parts
+    end
+    local a = parse(actual)
+    local r = parse(required)
+    local len = math.max(#a, #r)
+    for i = 1, len do
+        local av = a[i] or 0
+        local rv = r[i] or 0
+        if av > rv then return true end
+        if av < rv then return false end
+    end
+    return true -- equal
+end
+
 local radio = {
     runtimeData = {
         inMenu = false,
@@ -34,8 +61,8 @@ function radio:new()
             print("[RadioExt] Error: Red4Ext part of the mod is missing")
             return
         end
-        if tostring(RadioExt.GetVersion()) < minR4Version then
-            print("[RadioExt] Red4Ext Part version mismatch: Version is " .. RadioExt.GetVersion() .. " Expected: " .. minR4Version .. " or newer")
+        if not versionGte(RadioExt.GetVersion(), minR4Version) then
+            print("[RadioExt] Red4Ext Part version mismatch: Version is " .. tostring(RadioExt.GetVersion()) .. " Expected: " .. minR4Version .. " or newer")
             return
         end
 
@@ -65,16 +92,24 @@ function radio:new()
     end)
 
     registerForEvent("onShutdown", function()
-        self.radioManager:disableCustomRadios()
+        -- radioManager may be nil if onInit aborted early (missing Red4Ext part,
+        -- version mismatch, exception during init). Guard against nil so the
+        -- shutdown handler itself does not throw.
+        if self.radioManager and self.radioManager.disableCustomRadios then
+            self.radioManager:disableCustomRadios()
+        end
     end)
 
     registerForEvent("onUpdate", function(delta)
         if initializationError then return end
+        if not self.radioManager then return end
 
         if (not self.runtimeData.inMenu) and self.runtimeData.inGame then
             self.Cron.Update(delta)
             self.radioManager:update()
-            self.radioManager.managerV:handleTS()
+            if self.radioManager.managerV then
+                self.radioManager.managerV:handleTS()
+            end
             self.logger.update()
             audio.update(delta)
         else

@@ -2,10 +2,10 @@ local Cron = require("modules/utils/Cron")
 local utils = require("modules/utils/utils")
 local audio = require("modules/utils/audioEngine")
 
-radio = {}
+local radio = {}
 
 function radio:new(radioMod)
-	local o = {}
+        local o = {}
 
     o.rm = radioMod
 
@@ -28,8 +28,8 @@ function radio:new(radioMod)
 
     o.channels = {}
 
-	self.__index = self
-   	return setmetatable(o, self)
+        self.__index = self
+        return setmetatable(o, self)
 end
 
 function radio:getSongByPath(tab, path)
@@ -94,25 +94,63 @@ function radio:load(metadata, lengthData, path, index) -- metadata is the data p
     self:setupRecord(metadata, path)
     self:verifyOrder()
 
-    if #self.songs == 0 and not self.metadata.streamInfo.isStream then
-        print("[RadioExt] Error: Station \"" .. self.name .. "\" is not a stream, but also has no song files.")
+    local isStream = self.metadata.streamInfo.isStream
+
+    if #self.songs == 0 and not isStream then
+        print(("[RadioExt] Error: Station \"%s\" is not a stream, but also has no song files. The station will appear in the list but will not play anything."):format(tostring(self.name)))
     end
 
-    if not self.metadata.streamInfo.isStream then
-        self:startRadioSimulation()
+    if not isStream then
+        if #self.songs > 0 then
+            self:startRadioSimulation()
+        else
+            -- No songs and not a stream: don't crash startRadioSimulation,
+            -- just leave the simulation dormant. The station will still appear
+            -- in the radio list but won't play anything.
+            print(("[RadioExt] Warning: Station \"%s\" has no songs to simulate. Skipping radio simulation."):format(tostring(self.name)))
+            self.currentSong = { path = "silent", length = 999999 }
+            self.tick = 0
+        end
     else
         self.currentSong = { path = self.name, length = 0 } -- Used for the "playing now" HUD element
+        print(("[RadioExt] Station \"%s\" configured as web stream (URL: %s)"):format(tostring(self.name), tostring(self.metadata.streamInfo.streamURL)))
     end
 
-    for i = -1, RadioExt.GetNumChannels() do -- -1 is vehicle radio, 1 - CHANNELS is physical channels
+    -- Initialize every logical channel slot to "not playing".
+    -- -1 is the vehicle-radio sentinel (mapped to slot 0 on the C++ side);
+    -- 1..N are the physical-radio channels.
+    -- We deliberately skip index 0 on the Lua side because it is the internal
+    -- slot the C++ side reserves for the vehicle radio.
+    self.channels[-1] = false
+    for i = 1, RadioExt.GetNumChannels() do
         self.channels[i] = false
     end
 end
 
 function radio:startRadioSimulation()
     self:generateShuffelBag()
+
+    -- Guard against empty shuffle bag. This can happen if a station has no
+    -- songs (e.g. a file-based station whose folder is empty). Previously
+    -- this crashed with "attempt to index nil (local 'currentSong')",
+    -- which aborted the entire loadRadios loop and made all subsequent
+    -- stations vanish from the radio list.
+    if #self.shuffelBag == 0 then
+        print(("[RadioExt] Error: Station \"%s\" has no songs in shuffle bag. Cannot start radio simulation."):format(tostring(self.name)))
+        self.currentSong = { path = "silent", length = 999999 }
+        self.tick = 0
+        return
+    end
+
     self.currentSong = self.shuffelBag[1]
-    self.tick = math.random(self.currentSong.length - 15)
+    -- math.random(n) requires n >= 1. Short jingles or very short clips
+    -- (length <= 15s, including the 15s safety margin) previously crashed
+    -- the simulation on startup with "bad argument #1 to 'random'".
+    local maxStart = self.currentSong.length - 15
+    if maxStart < 1 then
+        maxStart = 1
+    end
+    self.tick = math.random(maxStart) - 1
     table.remove(self.shuffelBag, 1)
 
     -- TODO: Make this less stupid and more accurate, currently up to a second off, causing error on cpp side due to channel being invalid / ended
@@ -120,6 +158,13 @@ function radio:startRadioSimulation()
         if self.tick >= self.currentSong.length then
             self:currentSongDone()
             if #self.shuffelBag == 0 then self:generateShuffelBag() end
+
+            -- Guard again: if generateShuffelBag somehow produced an empty bag,
+            -- don't crash trying to access shuffelBag[1].
+            if #self.shuffelBag == 0 then
+                print(("[RadioExt] Warning: Station \"%s\" shuffle bag is empty during tick. Skipping song change."):format(tostring(self.name)))
+                return
+            end
 
             self.currentSong = self.shuffelBag[1]
             table.remove(self.shuffelBag, 1)
@@ -137,8 +182,13 @@ function radio:activate(channel, updateUI)
 
     self.channels[channel] = true
     if not self.metadata.streamInfo.isStream then
-        audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
+        local songPath = "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path
+        print(("[RadioExt] Activating file-based station \"%s\" on channel %d (song: %s, pos: %.1fs)"):format(
+            tostring(self.name), channel, tostring(self.currentSong.path), self.tick))
+        audio.playFile(channel, songPath, self.tick * 1000, self.volume)
     else
+        print(("[RadioExt] Activating stream station \"%s\" on channel %d (URL: %s)"):format(
+            tostring(self.name), channel, tostring(self.metadata.streamInfo.streamURL)))
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
 
@@ -151,6 +201,7 @@ function radio:deactivate(channel)
     if not self.channels[channel] then return end
 
     self.channels[channel] = false
+    print(("[RadioExt] Deactivating station \"%s\" on channel %d"):format(tostring(self.name), channel))
     audio.stopAudio(channel)
 end
 

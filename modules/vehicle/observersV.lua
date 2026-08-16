@@ -7,6 +7,24 @@ local observersV = {
     input = false
 }
 
+-- Safely extracts a display-friendly track name from an active vehicle radio
+-- descriptor. Handles nil/empty tracks, stream URLs, paths with no backslash,
+-- and filenames with no extension — all of which previously caused nil-index
+-- crashes in SetTrackName and TryShowVehicleRadioNotification.
+local function getTrackDisplayName(activeVRadio)
+    local path = activeVRadio.track
+    if type(path) ~= "string" or path == "" then
+        return activeVRadio.station or ""
+    end
+    if activeVRadio.isStream then
+        return path
+    end
+    local parts = utils.split(path, "\\")
+    local fileName = parts[#parts] or path       -- last component, not hardcoded [2]
+    local stripped = fileName:match("(.+)%..+$")  -- strip extension, if there is one
+    return stripped or fileName
+end
+
 local function getNextStationIndex(currentStation)
     -- Convert vanilla station to UI index (Same as what is stored in station record)
     if currentStation < 14 and currentStation ~= -1 then
@@ -46,7 +64,8 @@ function observersV.init(radioMod)
         local sorted = {}
 
         for _, v in pairs(stations) do -- Store in temp table for sorting by fm number
-            local fm = string.gsub(GetLocalizedText(v.record:DisplayName()), ",", ".")
+            local displayName = GetLocalizedText(v.record:DisplayName())
+            local fm = string.gsub(displayName, ",", ".")
 
             local split = utils.split(fm, " ")
             if tonumber(split[1]) then
@@ -55,17 +74,47 @@ function observersV.init(radioMod)
                 fm = tonumber(split[#split])
             end
 
-            if GetLocalizedText(v.record:DisplayName()) == "Enable Aux Radio" then fm = 0 end
+            -- If fm is still nil (station name has no number), default to 0
+            -- so the sort doesn't crash with "attempt to compare nil with number".
+            if fm == nil then
+                fm = 0
+            end
+
+            if displayName == "Enable Aux Radio" then fm = 0 end
 
             sorted[#sorted + 1] = { data = v, fm = fm }
         end
 
+        local customCount = 0
         for _, radio in pairs(observersV.radioMod.radioManager.radios) do -- Add custom radios
-            sorted[#sorted + 1] = { data = RadioListItemData.new({ record = TweakDBInterface.GetRadioStationRecord(radio.tdbName) }), fm = tonumber(radio.fm)}
+            -- Use tonumber with fallback to 0 so a non-numeric fm doesn't
+            -- crash the table.sort below.
+            local fmVal = tonumber(radio.fm)
+            if fmVal == nil then
+                print(("[RadioExt] Warning: Station \"%s\" has non-numeric fm (%s), using 0 for sorting."):format(
+                    tostring(radio.name), tostring(radio.fm)))
+                fmVal = 0
+            end
+
+            local record = TweakDBInterface.GetRadioStationRecord(radio.tdbName)
+            if record == nil then
+                print(("[RadioExt] Warning: TweakDB record \"%s\" not found for station \"%s\". Skipping."):format(
+                    tostring(radio.tdbName), tostring(radio.name)))
+            else
+                sorted[#sorted + 1] = { data = RadioListItemData.new({ record = record }), fm = fmVal }
+                customCount = customCount + 1
+            end
         end
 
+        radioMod.logger.log(("GetRadioStations: %d vanilla + %d custom stations"):format(#sorted - customCount, customCount))
+
         table.sort(sorted, function (a, b) -- Sort
-            return a.fm < b.fm
+            -- Nil-safe comparison: treat nil fm as 0 (infinity would push
+            -- broken stations to the end, but 0 keeps them at the top
+            -- where they're visible for debugging).
+            local af = a.fm or 0
+            local bf = b.fm or 0
+            return af < bf
         end)
 
         local stations = {}
@@ -82,17 +131,19 @@ function observersV.init(radioMod)
     Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, station, wrapped)
         radioMod.logger.log("QuickSlotsManager::SendRadioEvent")
         if station > 13 then
-            if GetMountedVehicle(GetPlayer()) then
+            local mountedVehicle = GetMountedVehicle(GetPlayer())
+            if mountedVehicle then
                 this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({ toggle = false, setStation = false, station = -1 })) -- Goes to the vehicle radio if there is any, disabling it
             end
-            if not GetMountedVehicle(GetPlayer()) or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
+            if not mountedVehicle or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
                 this.Player:QueueEvent(VehicleRadioEvent.new({ toggle = toggle, setStation = setStation, station = station })) -- Goes to PocketRadio::HandleVehicleRadioEvent
             end
 
             Cron.After(0.1, function ()
-                if GetMountedVehicle(GetPlayer()) then
-                    GetMountedVehicle(GetPlayer()):GetVehicleComponent().radioState = true
-                    GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+                local veh = GetMountedVehicle(GetPlayer())
+                if veh then
+                    veh:GetVehicleComponent().radioState = true
+                    veh:GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
                 end
             end)
         else
@@ -158,7 +209,14 @@ function observersV.init(radioMod)
             this:GetVehicle():ToggleRadioReceiver(false)
             return
         else
-            local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName) -- Get current radio name
+            local mountedVehicle = GetMountedVehicle(GetPlayer())
+            if not mountedVehicle then
+                -- No active custom radio and no mounted vehicle: nothing for us to do,
+                -- fall through to the vanilla handler so the engine can still toggle
+                -- the pocket radio.
+                return wrapped(evt)
+            end
+            local name = mountedVehicle:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName) -- Get current radio name
 
             if GetLocalizedTextByKey(name) ~= "" then
                 name = GetLocalizedTextByKey(name)
@@ -182,7 +240,12 @@ function observersV.init(radioMod)
     Override("PocketRadio", "HandleVehicleRadioStationChanged", function (this, evt, wrapped)
         if this.settings:GetSyncToCarRadio() then
             local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
-            evt.radioIndex = activeVRadio.index
+            -- Only override the index when a custom station is actually active.
+            -- Previously this crashed with a nil-index access whenever the player
+            -- was using a vanilla station.
+            if activeVRadio then
+                evt.radioIndex = activeVRadio.index
+            end
         end
         radioMod.logger.log("PocketRadio::HandleVehicleRadioStationChanged" .. tostring(evt.radioIndex))
         wrapped(evt)
@@ -236,11 +299,7 @@ function observersV.init(radioMod)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
 
-        local path = activeVRadio.track
-        if not activeVRadio.isStream then
-            path = utils.split(path, "\\")[2]
-            path = path:match("(.+)%..+$")
-        end
+        local path = getTrackDisplayName(activeVRadio)
 
         this.trackName:SetText(path)
         this.trackName:SetVisible(true)
@@ -300,17 +359,27 @@ function observersV.init(radioMod)
             Cron.After(0.1, function ()
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, cRadio.index)
                 Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
-                radioMod.radioManager.managerV:switchToRadio(radio)
+                if radio then
+                    radioMod.radioManager.managerV:switchToRadio(radio)
+                end
             end)
             Cron.After(0.5, function ()
-                GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
-                GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+                local veh = GetMountedVehicle(GetPlayer())
+                if veh then
+                    veh:GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
+                    veh:GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+                end
             end)
             radioMod.radioManager:updateVRadioVolume()
         else
             Cron.After(0.5, function ()
-                if GetPlayer():GetPocketRadio().isOn then
-                    GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, GetPlayer():GetPocketRadio():GetStationName())
+                local player = GetPlayer()
+                if not player then return end
+                if player:GetPocketRadio().isOn then
+                    local veh = GetMountedVehicle(player)
+                    if veh then
+                        veh:GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, player:GetPocketRadio():GetStationName())
+                    end
                 end
             end)
         end
@@ -347,11 +416,7 @@ function observersV.init(radioMod)
 
         inkTextRef.SetText(this.radioStationName, activeVRadio.station)
 
-        local path = activeVRadio.track
-        if not activeVRadio.isStream then
-            path = utils.split(path, "\\")[2]
-            path = path:match("(.+)%..+$")
-        end
+        local path = getTrackDisplayName(activeVRadio)
 
         inkTextRef.SetText(this.subText, path)
     end)
