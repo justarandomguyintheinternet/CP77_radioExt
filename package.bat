@@ -1,14 +1,10 @@
 @echo off
-setlocal enabledelayedexpansion
+setlocal EnableExtensions EnableDelayedExpansion
 
-:: ────────────────────────────────────────────
-::  RadioExt — Build & Package Script
-:: ────────────────────────────────────────────
+title RadioExt Packaging
 
 set "TEMP_DIR=_temp"
-set "RED4EXT_SRC=red4ext"
-set "RED4EXT_DIR=%TEMP_DIR%\red4ext\plugins\RadioExt"
-set "CET_DIR=%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt"
+set "ARCHIVE=RadioExt.zip"
 
 echo.
 echo ========================================
@@ -16,53 +12,243 @@ echo   RadioExt Packaging
 echo ========================================
 echo.
 
-:: ── Step 1: Clean & create temp structure ──
-echo [1/4] Preparing temp directory...
-if exist "%TEMP_DIR%" rmdir /S /Q "%TEMP_DIR%"
-mkdir "%RED4EXT_DIR%"
-mkdir "%CET_DIR%"
+:: ============================================================
+:: STEP 1 - Clean temp directory
+:: ============================================================
 
-:: ── Step 2: Copy DLLs & scripts ────────────
-echo [2/4] Copying files...
+echo [1/5] Cleaning temp directory...
 
-echo   radioext.dll  -^>  %RED4EXT_DIR%
-copy /Y "%RED4EXT_SRC%\RadioExt.dll" "%RED4EXT_DIR%\radioext.dll" >nul
-echo   fmod.dll      -^>  %RED4EXT_DIR%
-copy /Y "%RED4EXT_SRC%\fmod.dll"     "%RED4EXT_DIR%" >nul
+if exist "%TEMP_DIR%" (
+    rmdir /S /Q "%TEMP_DIR%"
+)
 
-echo   modules\      -^>  %CET_DIR%\modules\
-robocopy "modules" "%CET_DIR%\modules" /E /NFL /NDL /NJH /NJS >nul
-echo   radios\       -^>  %CET_DIR%\radios\
-robocopy "radios"  "%CET_DIR%\radios"  /E /NFL /NDL /NJH /NJS >nul
-echo   init.lua      -^>  %CET_DIR%
-copy /Y "init.lua"      "%CET_DIR%" >nul
-echo   metadata.json -^>  %CET_DIR%
-copy /Y "metadata.json" "%CET_DIR%" >nul
+mkdir "%TEMP_DIR%\red4ext\plugins\RadioExt"
+mkdir "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules"
+mkdir "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios"
 
-:: ── Step 3: Zip from temp ──────────────────
-echo [3/4] Creating archive...
+if errorlevel 1 (
+    echo.
+    echo ERROR: Failed to create temporary directory structure.
+    goto :error
+)
+
+echo       OK
+echo.
+
+
+:: ============================================================
+:: STEP 2 - Copy Red4Ext files
+:: ============================================================
+
+echo [2/5] Copying Red4Ext files...
+
+if not exist "red4ext\RadioExt.dll" (
+    echo ERROR: red4ext\RadioExt.dll does not exist.
+    goto :error
+)
+
+if not exist "red4ext\fmod.dll" (
+    echo ERROR: red4ext\fmod.dll does not exist.
+    goto :error
+)
+
+copy /Y "red4ext\RadioExt.dll" "%TEMP_DIR%\red4ext\plugins\RadioExt\radioext.dll"
+
+if errorlevel 1 (
+    echo ERROR: Failed to copy RadioExt.dll.
+    goto :error
+)
+
+copy /Y "red4ext\fmod.dll" "%TEMP_DIR%\red4ext\plugins\RadioExt\fmod.dll"
+
+if errorlevel 1 (
+    echo ERROR: Failed to copy fmod.dll.
+    goto :error
+)
+
+echo       OK
+echo.
+
+
+:: ============================================================
+:: STEP 3 - Copy CET files
+:: ============================================================
+
+echo [3/5] Copying CET files...
+
+if not exist "init.lua" (
+    echo ERROR: init.lua does not exist.
+    goto :error
+)
+
+if not exist "metadata.json" (
+    echo ERROR: metadata.json does not exist.
+    goto :error
+)
+
+if not exist "modules" (
+    echo ERROR: modules directory does not exist.
+    goto :error
+)
+
+if not exist "radios" (
+    echo ERROR: radios directory does not exist.
+    goto :error
+)
+
+copy /Y "init.lua" "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\init.lua"
+
+if errorlevel 1 (
+    echo ERROR: Failed to copy init.lua.
+    goto :error
+)
+
+copy /Y "metadata.json" "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\metadata.json"
+
+if errorlevel 1 (
+    echo ERROR: Failed to copy metadata.json.
+    goto :error
+)
+
+robocopy "modules" "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\modules" /E /NFL /NDL /NJH /NJS
+
+if errorlevel 8 (
+    echo ERROR: Failed to copy modules.
+    goto :error
+)
+
+robocopy "radios" "%TEMP_DIR%\bin\x64\plugins\cyber_engine_tweaks\mods\radioExt\radios" /E /NFL /NDL /NJH /NJS
+
+if errorlevel 8 (
+    echo ERROR: Failed to copy radios.
+    goto :error
+)
+
+echo       OK
+echo.
+
+
+:: ============================================================
+:: STEP 4 - Determine version
+:: ============================================================
+
+echo [4/5] Determining archive name...
 
 set "VERSION="
-for /f "tokens=2 delims=: " %%v in ('findstr /r /c:"\"displayName\"" metadata.json') do (
-    set "VERSION=%%~v"
+
+if exist "src\main.cpp" (
+    for /f "delims=" %%V in ('powershell -NoProfile -Command "$x=Get-Content 'src\main.cpp' -Raw; if($x -match 'RadioExtVersion[^0-9]*([0-9]+\.[0-9]+\.[0-9]+)'){Write-Output $matches[1]}"') do (
+        set "VERSION=%%V"
+    )
 )
+
 if defined VERSION (
-    set "ARCHIVE=RadioExt_%VERSION:"=%.zip"
+    set "ARCHIVE=RadioExt_!VERSION!.zip"
+    echo       Version found: !VERSION!
 ) else (
-    set "ARCHIVE=RadioExt.zip"
+    echo       No version found.
+    echo       Using: RadioExt.zip
 )
+
+echo       Archive: !ARCHIVE!
+echo.
+
+
+:: ============================================================
+:: STEP 5 - Create ZIP
+:: ============================================================
+
+echo [5/5] Creating ZIP...
+
+if exist "!ARCHIVE!" (
+    echo       Removing existing !ARCHIVE!...
+    del /F /Q "!ARCHIVE!"
+)
+
+echo       Compressing:
+echo         %TEMP_DIR%\bin
+echo         %TEMP_DIR%\red4ext
+echo.
+
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+    "$ErrorActionPreference = 'Stop';" ^
+    "Compress-Archive -Path '%TEMP_DIR%\bin','%TEMP_DIR%\red4ext' -DestinationPath '%ARCHIVE%' -Force;"
+
+if errorlevel 1 (
+    echo.
+    echo ERROR: PowerShell failed to create the ZIP.
+    goto :error
+)
+
+if not exist "!ARCHIVE!" (
+    echo.
+    echo ERROR: ZIP command completed but !ARCHIVE! does not exist.
+    goto :error
+)
+
+echo.
+echo       ZIP CREATED SUCCESSFULLY.
+echo.
+
+
+:: ============================================================
+:: Verify ZIP contents
+:: ============================================================
+
+echo Verifying ZIP contents...
 
 powershell -NoProfile -Command ^
-    "if (Test-Path '%ARCHIVE%') { Remove-Item '%ARCHIVE%' }; " ^
-    "Compress-Archive -Path '%TEMP_DIR%\bin', '%TEMP_DIR%\red4ext' -DestinationPath '%ARCHIVE%' -Force"
+    "Add-Type -AssemblyName System.IO.Compression.FileSystem; " ^
+    "$z=[IO.Compression.ZipFile]::OpenRead('%ARCHIVE%'); " ^
+    "$z.Entries | ForEach-Object { Write-Host ('  ' + $_.FullName) }; " ^
+    "$z.Dispose()"
 
-:: ── Step 4: Cleanup ────────────────────────
-echo [4/4] Cleaning up...
-rmdir /S /Q "%TEMP_DIR%"
+if errorlevel 1 (
+    echo.
+    echo WARNING: Could not verify ZIP contents.
+) else (
+    echo.
+    echo ZIP verification complete.
+)
+
+:: ============================================================
+:: Cleanup
+:: ============================================================
+
+echo.
+echo Cleaning temporary directory...
+
+rmdir /S /Q "%TEMP_DIR%" 2>nul
 
 echo.
 echo ========================================
-echo   Done!  Archive: %ARCHIVE%
+echo   BUILD SUCCESSFUL
 echo ========================================
 echo.
+echo   Created:
+echo     !ARCHIVE!
+echo.
+echo ========================================
+echo.
+
+pause
 endlocal
+exit /b 0
+
+
+:error
+
+echo.
+echo ========================================
+echo   PACKAGING FAILED
+echo ========================================
+echo.
+echo Temporary files have been kept in:
+echo   %TEMP_DIR%
+echo.
+echo Check the error above.
+echo.
+pause
+
+endlocal
+exit /b 1
