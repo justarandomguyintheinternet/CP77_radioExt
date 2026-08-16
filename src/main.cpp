@@ -125,20 +125,74 @@ void LogFmodError(FMOD_RESULT aResult, const char* aMessage)
     }
 }
 
+/// Returns true if the FMOD error is one of the expected "channel handoff"
+/// errors that occur when FMOD reuses a channel slot internally. These are
+/// not real errors — they happen during normal operation when a new sound
+/// steals a channel that was still being referenced by an old pointer.
+/// Logging them at error level caused massive log spam (1000+ lines) when
+/// multiple custom stations were active or when other radio mods were installed.
+bool IsExpectedHandoffError(FMOD_RESULT aResult)
+{
+    return aResult == FMOD_ERR_INVALID_HANDLE
+        || aResult == FMOD_ERR_CHANNEL_REUSE
+        || aResult == FMOD_ERR_CHANNEL_STOLEN;
+}
+
+/// Same as LogFmodError but suppresses expected channel-handoff errors.
+/// Use this for operations on channels that may have been reused by FMOD
+/// between the time the pointer was stored and the time it is used.
+void LogFmodErrorSilent(FMOD_RESULT aResult, const char* aMessage)
+{
+    if (aResult != FMOD_OK && !IsExpectedHandoffError(aResult))
+    {
+        Sdk->logger->ErrorF(PluginHandle, "%s: %s", aMessage, FMOD_ErrorString(aResult));
+    }
+}
+
+/// Probes whether a cached FMOD::Channel* pointer is still valid.
+/// FMOD reuses channel slots internally: when a new sound steals a channel,
+/// the old FMOD::Channel* handle becomes invalid and any operation on it
+/// returns FMOD_ERR_INVALID_HANDLE or FMOD_ERR_CHANNEL_REUSE.
+/// We probe with isPlaying() (a lightweight call) to detect this. If the
+/// channel is stale, the caller should null out its cached pointer.
+bool IsChannelValid(FMOD::Channel* aChannel)
+{
+    if (aChannel == nullptr)
+    {
+        return false;
+    }
+    bool playing = false;
+    auto result = aChannel->isPlaying(&playing);
+    // FMOD_OK means the handle is valid (whether or not the channel is
+    // currently playing). Any other return value means the handle is stale.
+    return result == FMOD_OK;
+}
+
 void SetFadeIn(FMOD::Channel* aChannel, float aDuration)
 {
-    LogFmodError(aChannel->setPaused(true), "setPaused(true)");
+    // Guard against stale channel handles. FMOD may have reused the channel
+    // slot between the playSound() call and this fade-in setup.
+    if (!IsChannelValid(aChannel))
+    {
+        return;
+    }
+
+    LogFmodErrorSilent(aChannel->setPaused(true), "setPaused(true)");
 
     auto dspClock = 0ull;
     auto rate = 0;
 
     FMOD::System* system = nullptr;
-    LogFmodError(aChannel->getSystemObject(&system), "getSystemObject");
-    LogFmodError(system->getSoftwareFormat(&rate, nullptr, nullptr), "getSoftwareFormat");
-    LogFmodError(aChannel->getDSPClock(nullptr, &dspClock), "getDSPClock");
-    LogFmodError(aChannel->addFadePoint(dspClock, 0.0f), "addFadePoint");
-    LogFmodError(aChannel->addFadePoint(dspClock + (rate * aDuration), 1.0f), "addFadePoint");
-    LogFmodError(aChannel->setPaused(false), "setPaused(false)");
+    LogFmodErrorSilent(aChannel->getSystemObject(&system), "getSystemObject");
+    if (system == nullptr)
+    {
+        return;
+    }
+    LogFmodErrorSilent(system->getSoftwareFormat(&rate, nullptr, nullptr), "getSoftwareFormat");
+    LogFmodErrorSilent(aChannel->getDSPClock(nullptr, &dspClock), "getDSPClock");
+    LogFmodErrorSilent(aChannel->addFadePoint(dspClock, 0.0f), "addFadePoint");
+    LogFmodErrorSilent(aChannel->addFadePoint(dspClock + (rate * aDuration), 1.0f), "addFadePoint");
+    LogFmodErrorSilent(aChannel->setPaused(false), "setPaused(false)");
 }
 
 // ---------------------------------------------------------------------------
@@ -437,8 +491,16 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
 
     if (Channels[normalizedId])
     {
-        Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setVolume: %s",
-                           FMOD_ErrorString(Channels[normalizedId]->setVolume(volume)));
+        if (IsChannelValid(Channels[normalizedId]))
+        {
+            Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setVolume: %s",
+                               FMOD_ErrorString(Channels[normalizedId]->setVolume(volume)));
+        }
+        else
+        {
+            // Channel was reused by FMOD; clear the stale pointer.
+            Channels[normalizedId] = nullptr;
+        }
     }
 
     aFrame->code++; // skip ParamEnd
@@ -473,7 +535,14 @@ void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, f
     {
         if (Channels[i])
         {
-            LogFmodError(Channels[i]->set3DMinMaxDistance(minDistance, maxDistance), "Set3DMinMax");
+            if (IsChannelValid(Channels[i]))
+            {
+                LogFmodErrorSilent(Channels[i]->set3DMinMaxDistance(minDistance, maxDistance), "Set3DMinMax");
+            }
+            else
+            {
+                Channels[i] = nullptr;
+            }
         }
     }
 
@@ -494,7 +563,10 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 
     if (Channels[normalizedId])
     {
-        LogFmodError(Channels[normalizedId]->stop(), "FMOD::Channel*->stop()");
+        // Use silent logging: if the channel was reused by FMOD, stop() returns
+        // FMOD_ERR_INVALID_HANDLE / FMOD_ERR_CHANNEL_REUSE, which is expected
+        // and should not spam the log.
+        LogFmodErrorSilent(Channels[normalizedId]->stop(), "FMOD::Channel*->stop()");
         Channels[normalizedId] = nullptr;
         Sdk->logger->InfoF(PluginHandle, "Stopped channel %i", normalizedId);
     }
@@ -521,8 +593,17 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
 
     if (Channels[normalizedId])
     {
-        LogFmodError(Channels[normalizedId]->set3DAttributes(&posFmod, nullptr),
-                     "SetChannelTransform::set3DListenerAttributes");
+        if (IsChannelValid(Channels[normalizedId]))
+        {
+            LogFmodErrorSilent(Channels[normalizedId]->set3DAttributes(&posFmod, nullptr),
+                               "SetChannelTransform::set3DAttributes");
+        }
+        else
+        {
+            // Channel was reused by FMOD; clear the stale pointer so we don't
+            // keep probing it on every frame.
+            Channels[normalizedId] = nullptr;
+        }
     }
 
     aFrame->code++; // skip ParamEnd
@@ -594,11 +675,11 @@ void CheckSoundLoad()
             auto volume = std::max(0.0f, LoadData[i]->volume);
 
             // Stop any previously active channel on this slot before starting a new one.
-            // This prevents FMOD from holding two overlapping sounds on the same logical channel
-            // (which can happen if Stop() was missed, e.g. due to the Lua-side rate limiter).
+            // Use silent logging: if FMOD already reused this channel, stop() returns
+            // an expected handoff error that should not spam the log.
             if (Channels[i] != nullptr)
             {
-                Channels[i]->stop();
+                LogFmodErrorSilent(Channels[i]->stop(), "CheckSoundLoad::stop previous channel");
                 Channels[i] = nullptr;
             }
 
@@ -614,12 +695,23 @@ void CheckSoundLoad()
             }
             else
             {
-                Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setPosition: %s",
-                                   FMOD_ErrorString(Channels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
-                Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setVolume: %s",
-                                   FMOD_ErrorString(Channels[i]->setVolume(volume)));
+                // Validate the new channel before operating on it. In rare cases
+                // FMOD can immediately reuse the slot between playSound and the
+                // setPosition call below.
+                if (IsChannelValid(Channels[i]))
+                {
+                    Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setPosition: %s",
+                                       FMOD_ErrorString(Channels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
+                    Sdk->logger->InfoF(PluginHandle, "FMOD::Channel::setVolume: %s",
+                                       FMOD_ErrorString(Channels[i]->setVolume(volume)));
 
-                SetFadeIn(Channels[i], LoadData[i]->fade);
+                    SetFadeIn(Channels[i], LoadData[i]->fade);
+                }
+                else
+                {
+                    Sdk->logger->InfoF(PluginHandle, "Channel %i became invalid immediately after playSound", i);
+                    Channels[i] = nullptr;
+                }
             }
         }
         else if (state == FMOD_OPENSTATE_ERROR)

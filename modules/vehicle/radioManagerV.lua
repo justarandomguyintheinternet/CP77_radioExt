@@ -6,6 +6,7 @@ function managerV:new(manager, radioMod)
     o.manager = manager
     o.isMounted = false
     o.rm = radioMod
+    o.menuDeactivated = false
 
         self.__index = self
         return setmetatable(o, self)
@@ -40,6 +41,7 @@ function managerV:disableCustomRadio() -- Just stop playback
 end
 
 function managerV:update()
+    self.menuDeactivated = false
     local player = GetPlayer()
     if not player then return end
 
@@ -70,6 +72,7 @@ function managerV:update()
 end
 
 function managerV:handleMenu()
+    if self.menuDeactivated then return end
     local player = GetPlayer()
     if not player then return end
 
@@ -89,6 +92,7 @@ function managerV:handleMenu()
         radio.channels[-1] = true -- hacky asf, no clue why it doesnt work otherwise
         radio:deactivate(-1)
     end
+    self.menuDeactivated = true
 end
 
 -- Returns data of radio station, if there is any active radio station being used for vehicle radio
