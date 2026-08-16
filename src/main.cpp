@@ -6,6 +6,7 @@
 #include <fmod_errors.h>
 #include <algorithm>
 #include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <unordered_map>
 #include "SoundLoadData.hpp"
@@ -131,11 +132,44 @@ void LogFmodError(FMOD_RESULT aResult, const char* aMessage)
 /// steals a channel that was still being referenced by an old pointer.
 /// Logging them at error level caused massive log spam (1000+ lines) when
 /// multiple custom stations were active or when other radio mods were installed.
+///
+/// FMOD's error code names have shifted across versions: older SDKs used
+/// FMOD_ERR_CHANNEL_REUSE and FMOD_ERR_CHANNEL_STOLEN, while newer ones
+/// (2.02+) consolidated these. We use #ifdef guards so the code compiles
+/// against any FMOD SDK version. As a final fallback, we match the error
+/// string returned by FMOD_ErrorString, so even unknown error codes with
+/// the "channel has been reused" / "invalid handle" text are recognized.
 bool IsExpectedHandoffError(FMOD_RESULT aResult)
 {
-    return aResult == FMOD_ERR_INVALID_HANDLE
-        || aResult == FMOD_ERR_CHANNEL_REUSE
-        || aResult == FMOD_ERR_CHANNEL_STOLEN;
+    if (aResult == FMOD_OK)
+    {
+        return false;
+    }
+
+    // Known error codes (present in most FMOD versions)
+#ifdef FMOD_ERR_INVALID_HANDLE
+    if (aResult == FMOD_ERR_INVALID_HANDLE) return true;
+#endif
+#ifdef FMOD_ERR_CHANNEL_REUSE
+    if (aResult == FMOD_ERR_CHANNEL_REUSE) return true;
+#endif
+#ifdef FMOD_ERR_CHANNEL_STOLEN
+    if (aResult == FMOD_ERR_CHANNEL_STOLEN) return true;
+#endif
+
+    // String-based fallback for FMOD versions where the error code name
+    // differs but the error message text is the same.
+    const char* errStr = FMOD_ErrorString(aResult);
+    if (errStr != nullptr)
+    {
+        // "The specified channel has been reused to play another sound." (FMOD 2.02+)
+        // "Invalid handle" / "The handle is invalid."
+        return std::strstr(errStr, "reused") != nullptr
+            || std::strstr(errStr, "Invalid handle") != nullptr
+            || std::strstr(errStr, "invalid handle") != nullptr;
+    }
+
+    return false;
 }
 
 /// Same as LogFmodError but suppresses expected channel-handoff errors.
