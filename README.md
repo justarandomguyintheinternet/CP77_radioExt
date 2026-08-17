@@ -102,4 +102,3 @@ A mod for CP2077 that allows for the addition of radio stations.
 #### Credits
 - Uses [FMOD](https://www.fmod.com/) by Firelight Technologies
 - [psiberx](https://github.com/psiberx/cp2077-cet-kit) for Cron.lua, GameUI.lua and GameSettings.lua
-- [WSS](https://github.com/WSSDude420) for letting me use some of his C++ code
