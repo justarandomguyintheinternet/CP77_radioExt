@@ -31,7 +31,7 @@ end
 
 local function isValidExtension(extension)
     for _, ext in pairs(extensions) do
-        if extension == ("." .. ext) then
+        if string.lower(extension) == ("." .. ext) then
             return true
         end
     end

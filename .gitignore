@@ -4,3 +4,10 @@
 *.log
 *.mp3
 *.json
+GAME_SOURCE/*
+
+cmake-build-*/
+build/
+out/
+.idea/
+CMakeUserPresets.json
