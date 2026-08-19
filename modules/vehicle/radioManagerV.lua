@@ -86,18 +86,4 @@ function managerV:getActiveStationData()
     return nil
 end
 
-function managerV:handleTS() -- trainSystem comp
-    if self.rm.runtimeData.ts then
-        if not self.rm.runtimeData.ts.stationSys then return end
-        local train = self.rm.runtimeData.ts.stationSys.activeTrain
-        if train and train.playerMounted then
-            for _, radio in pairs(self.manager.radios) do
-                if radio.channels[-1] then
-                    GetMountedVehicle(GetPlayer()):ToggleRadioReceiver(false)
-                end
-            end
-        end
-    end
-end
-
 return managerV

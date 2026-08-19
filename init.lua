@@ -15,8 +15,7 @@ local radio = {
     runtimeData = {
         inMenu = false,
         inGame = false,
-        time = nil,
-        ts = nil
+        time = nil
     },
     GameUI = require("modules/utils/GameUI"),
     config = require("modules/utils/config"),
@@ -57,7 +56,6 @@ function radio:new()
 
         self.observersV.init(self)
         self.observersP.init(self)
-        self.runtimeData.ts = GetMod("trainSystem")
 
         self.runtimeData.inGame = not self.GameUI.IsDetached() -- Required to check if ingame after reloading all mods
 
@@ -74,7 +72,6 @@ function radio:new()
         if (not self.runtimeData.inMenu) and self.runtimeData.inGame then
             self.Cron.Update(delta)
             self.radioManager:update()
-            self.radioManager.managerV:handleTS()
             self.logger.update()
             audio.update(delta)
         else
