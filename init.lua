@@ -51,7 +51,7 @@ function radio:new()
 
         self.GameUI.OnSessionEnd(function()
             self.runtimeData.inGame = false
-            self.radioManager:disableCustomRadios()
+            self.radioManager:sessionEnd()
         end)
 
         self.observersV.init(self)
@@ -63,7 +63,7 @@ function radio:new()
     end)
 
     registerForEvent("onShutdown", function()
-        self.radioManager:disableCustomRadios()
+        self.radioManager:sessionEnd()
     end)
 
     registerForEvent("onUpdate", function(delta)

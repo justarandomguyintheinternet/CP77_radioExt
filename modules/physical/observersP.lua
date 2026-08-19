@@ -66,7 +66,7 @@ function observersP.init(radioMod)
         local active = this:GetDevicePS():GetActiveStationIndex()
 
         if active > 13 then
-            local radio = radioMod.radioManager.radios[active - 13]
+            local radio = radioMod.radioManager:getRadioByIndex(active)
 
             GameObject.AudioSwitch(this, "radio_station", "station_none", "radio")
             local object = radioMod.radioManager.managerP:getObjectByHandle(this)
@@ -100,7 +100,7 @@ function observersP.init(radioMod)
         local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
 
         if active > 13 then
-            local radio = radioMod.radioManager.radios[active - 13]
+            local radio = radioMod.radioManager:getRadioByIndex(active)
 
             local iconRecord = TweakDBInterface.GetUIIconRecord(radio.icon)
             inkImageRef.SetAtlasResource(this.stationLogoWidget, iconRecord:AtlasResourcePath())
@@ -117,7 +117,7 @@ function observersP.init(radioMod)
             return
         end
 
-        local radio = radioMod.radioManager.radios[active - 13]
+        local radio = radioMod.radioManager:getRadioByIndex(active)
         if radio then
             inkTextRef.SetText(this.stationNameWidget, radio.name)
         end

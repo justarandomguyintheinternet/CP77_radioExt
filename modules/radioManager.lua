@@ -92,7 +92,7 @@ function radioManager:loadRadios() -- Loads radios
     local radios = RadioExt.GetFolders("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios")
     if not radios then return end
 
-    for index, path in pairs(radios) do
+    for _, path in ipairs(radios) do
         if not config.fileExists("radios/" .. path .. "/metadata.json") then
             print("[RadioExt] Could not find metadata.json file in \"radios/" .. path .. "\"")
         else
@@ -106,7 +106,8 @@ function radioManager:loadRadios() -- Loads radios
                 self:backwardsCompatibility(metadata, path)
 
                 local r = require("modules/radioStation"):new(self.rm)
-                r:load(metadata, songs, path, index)
+
+                r:load(metadata, songs, path, #self.radios + 1)
                 self.radios[#self.radios + 1] = r
             else
                 print("[RadioExt] Error: Failed to load the metadata.json file for \"" .. path .. "\". Make sure the file is valid.")
@@ -137,7 +138,7 @@ function radioManager:getRadioByIndex(index)
     return nil
 end
 
-function radioManager:disableCustomRadios() -- Disables all custom radios, vehicle and physical
+function radioManager:sessionEnd()
     for _, radio in pairs(self.radios) do
         radio:deactivate(-1)
     end
