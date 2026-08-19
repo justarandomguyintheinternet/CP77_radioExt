@@ -1,4 +1,5 @@
 local config = require("modules/utils/config")
+local utils = require("modules/utils/utils")
 
 local radioManager = {}
 
@@ -54,29 +55,80 @@ function radioManager:getSongLengths(radioName)
     return songs
 end
 
-function radioManager:backwardsCompatibility(metadata, path)
-    if metadata.customIcon == nil then
-        metadata.customIcon = {
-            ["useCustom"] = false,
-            ["inkAtlasPath"] = "",
-            ["inkAtlasPart"] = ""
-        }
-
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
-    end
-
-    if metadata.streamInfo == nil then
-        metadata.streamInfo = {
+local function getDefaultMetadata(path)
+    return {
+        displayName = path, -- Folder name
+        fm = 0,
+        volume = 1.0,
+        icon = "default",
+        customIcon = {
+            useCustom = false,
+            inkAtlasPath = "",
+            inkAtlasPart = ""
+        },
+        streamInfo = {
             isStream = false,
             streamURL = ""
-        }
+        },
+        order = {}
+    }
+end
 
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+local function defaultToString(default)
+    if type(default) == "table" then
+        return json.encode(default)
+    elseif type(default) == "string" then
+        return "\"" .. default .. "\""
     end
 
-    if metadata.order == nil then
-        metadata.order = {}
+    return tostring(default)
+end
 
+local function coerceToType(value, default)
+    if type(default) == "number" then
+        return tonumber(value)
+    elseif type(default) == "string" and type(value) == "number" then
+        return tostring(value)
+    end
+
+    return nil
+end
+
+local function repairFields(data, defaults, path, prefix)
+    local changed = false
+
+    for key, default in pairs(defaults) do
+        local value = data[key]
+        local field = prefix .. key
+
+        if value == nil then
+            data[key] = utils.deepcopy(default)
+            print("[RadioExt] Warning: Station \"" .. path .. "\" is missing the field \"" .. field .. "\" in its metadata.json, defaulting to " .. defaultToString(default) .. ".")
+            changed = true
+        elseif type(value) ~= type(default) then
+            local coerced = coerceToType(value, default)
+
+            -- try to recover from wrong typed field
+            if coerced ~= nil then
+                data[key] = coerced
+                print("[RadioExt] Warning: Station \"" .. path .. "\" has the field \"" .. field .. "\" as a " .. type(value) .. " in its metadata.json, expected a " .. type(default) .. ". Using " .. defaultToString(coerced) .. " instead.")
+            -- fucked up so bad we have to use defaults
+            else
+                data[key] = utils.deepcopy(default)
+                print("[RadioExt] Warning: Station \"" .. path .. "\" has an invalid value for the field \"" .. field .. "\" in its metadata.json (expected a " .. type(default) .. ", got a " .. type(value) .. "), defaulting to " .. defaultToString(default) .. ".")
+            end
+
+            changed = true
+        elseif type(default) == "table" then
+            changed = repairFields(value, default, path, field .. ".") or changed
+        end
+    end
+
+    return changed
+end
+
+function radioManager:backwardsCompatibility(metadata, path)
+    if repairFields(metadata, getDefaultMetadata(path), path, "") then
         config.saveFile("radios/" .. path .. "/metadata.json", metadata)
     end
 end

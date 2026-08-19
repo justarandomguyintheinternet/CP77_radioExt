@@ -65,7 +65,7 @@ function observersV.init(radioMod)
         end
 
         table.sort(sorted, function (a, b) -- Sort
-            return a.fm < b.fm
+            return (a.fm or 0) < (b.fm or 0)
         end)
 
         local stations = {}
@@ -180,8 +180,8 @@ function observersV.init(radioMod)
 
     -- The event for this seems to come from engine side, always wants to set the last native station that it had, so this is needed to avoid the station getting set to some native one everytime a vehicle is entered
     Override("PocketRadio", "HandleVehicleRadioStationChanged", function (this, evt, wrapped)
-        if this.settings:GetSyncToCarRadio() then
-            local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        if this.settings:GetSyncToCarRadio() and activeVRadio then
             evt.radioIndex = activeVRadio.index
         end
         radioMod.logger.log("PocketRadio::HandleVehicleRadioStationChanged" .. tostring(evt.radioIndex))

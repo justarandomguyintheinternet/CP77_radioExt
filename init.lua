@@ -63,6 +63,7 @@ function radio:new()
     end)
 
     registerForEvent("onShutdown", function()
+        if initializationError then return end
         self.radioManager:sessionEnd()
     end)
 

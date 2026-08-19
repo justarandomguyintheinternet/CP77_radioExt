@@ -1,4 +1,4 @@
-miscUtils = {}
+local miscUtils = {}
 
 function miscUtils.isSameInstance(a, b)
 	return Game['OperatorEqual;IScriptableIScriptable;Bool'](a, b)
@@ -52,7 +52,7 @@ function miscUtils.removeItem(tab, val)
 end
 
 function miscUtils.split(s, delimiter) --https://www.codegrepper.com/code-examples/lua/lua+split+string+by+space
-    result = {};
+    local result = {};
     for match in (s..delimiter):gmatch("(.-)"..delimiter) do
         table.insert(result, match);
     end

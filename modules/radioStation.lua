@@ -2,7 +2,7 @@ local Cron = require("modules/utils/Cron")
 local utils = require("modules/utils/utils")
 local audio = require("modules/utils/audioEngine")
 
-radio = {}
+local radio = {}
 
 function radio:new(radioMod)
 	local o = {}
