@@ -2,12 +2,13 @@
 
 local observersP = {}
 
+local function canRespondToAction(controller)
+    return not (controller:IsDisabled() or controller:IsUnpowered() or not controller:IsON())
+end
+
 local function handleActionNotifier(controller, evt)
     local notifier = ActionNotifier.new()
     notifier:SetNone()
-    if controller:IsDisabled() or controller:IsUnpowered() or not controller:IsON() then
-        return EntityNotificationType.DoNotNotifyEntity
-    end
     controller:Notify(notifier, evt)
     return EntityNotificationType.SendThisEventToEntity
 end
@@ -15,6 +16,10 @@ end
 function observersP.init(radioMod)
     -- 13 total vanilla stations, 4 is the first one
     Override("RadioControllerPS", "OnNextStation", function (this, evt, wrapped)
+        if not canRespondToAction(this) then
+            return EntityNotificationType.DoNotNotifyEntity
+        end
+
         if RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation) > 12 or this.activeStation > 13 then
             this.previousStation = this.activeStation
             this.activeStation = math.max(RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation), this.activeStation) + 1
@@ -30,6 +35,14 @@ function observersP.init(radioMod)
     end)
 
     Override("RadioControllerPS", "OnPreviousStation", function (this, evt, wrapped)
+        if not canRespondToAction(this) then
+            return EntityNotificationType.DoNotNotifyEntity
+        end
+
+        if #radioMod.radioManager.radios == 0 then
+            return wrapped(evt)
+        end
+
         if this.activeStation > 13 then
             this.previousStation = this.activeStation
             this.activeStation = this.activeStation - 1
@@ -68,6 +81,11 @@ function observersP.init(radioMod)
         if active > 13 then
             local radio = radioMod.radioManager:getRadioByIndex(active)
 
+            if not radio then
+                radioMod.radioManager.managerP:removeObjectByHandle(this)
+                return
+            end
+
             GameObject.AudioSwitch(this, "radio_station", "station_none", "radio")
             local object = radioMod.radioManager.managerP:getObjectByHandle(this)
             if object then
@@ -98,10 +116,10 @@ function observersP.init(radioMod)
 
     Override("RadioInkGameController", "SetupStationLogo", function (this, wrapped)
         local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
+        local radio = active > 13 and radioMod.radioManager:getRadioByIndex(active) or nil
 
-        if active > 13 then
-            local radio = radioMod.radioManager:getRadioByIndex(active)
 
+        if radio then
             local iconRecord = TweakDBInterface.GetUIIconRecord(radio.icon)
             inkImageRef.SetAtlasResource(this.stationLogoWidget, iconRecord:AtlasResourcePath())
             inkImageRef.SetTexturePart(this.stationLogoWidget, iconRecord:AtlasPartName())
