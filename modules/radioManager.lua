@@ -129,7 +129,10 @@ end
 
 function radioManager:backwardsCompatibility(metadata, path)
     if repairFields(metadata, getDefaultMetadata(path), path, "") then
-        config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+        local saved, saveError = config.saveFile("radios/" .. path .. "/metadata.json", metadata)
+        if not saved then
+            print("[RadioExt] Warning: Failed to save migrated metadata.json for station \"" .. path .. "\": " .. tostring(saveError))
+        end
     end
 end
 

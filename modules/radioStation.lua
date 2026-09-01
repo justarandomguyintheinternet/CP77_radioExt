@@ -40,13 +40,15 @@ end
 
 function radio:verifyOrder() -- Verify all the songs for the order exist
     local ordered = {}
+    local seen = {}
 
     for _, song in pairs(self.metadata.order) do
         local songTable = self:getSongByPath(self.songs, self.path .. "\\" .. song)
         if songTable == nil then
             print("[RadioExt] Warning: The file \"" .. song .. "\" requested for the ordering of station \"" .. self.name .. "\" was not found.")
-        else
+        elseif not seen[songTable.path] then
             table.insert(ordered, songTable)
+            seen[songTable.path] = true
         end
     end
 

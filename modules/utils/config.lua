@@ -22,10 +22,30 @@ function config.loadFile(path)
 end
 
 function config.saveFile(path, data)
-    local file = io.open(path, "w")
-    local jconfig = json.encode(data)
-    file:write(jconfig)
-    file:close()
+    local encoded, jconfig = pcall(json.encode, data)
+    if not encoded then
+        return false, jconfig
+    end
+
+    local file, openError = io.open(path, "w")
+    if not file then
+        return false, openError
+    end
+
+    local wrote, writeResult, writeError = pcall(file.write, file, jconfig)
+    local closed, closeResult, closeError = pcall(file.close, file)
+
+    if not wrote then
+        return false, writeResult
+    elseif not writeResult then
+        return false, writeError
+    elseif not closed then
+        return false, closeResult
+    elseif not closeResult then
+        return false, closeError
+    end
+
+    return true
 end
 
 function config.backwardComp(path, data)

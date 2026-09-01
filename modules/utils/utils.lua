@@ -48,7 +48,10 @@ function miscUtils.getIndex(tab, val)
 end
 
 function miscUtils.removeItem(tab, val)
-    table.remove(tab, miscUtils.getIndex(tab, val))
+    local index = miscUtils.getIndex(tab, val)
+    if index then
+        table.remove(tab, index)
+    end
 end
 
 function miscUtils.split(s, delimiter) --https://www.codegrepper.com/code-examples/lua/lua+split+string+by+space
@@ -57,6 +60,25 @@ function miscUtils.split(s, delimiter) --https://www.codegrepper.com/code-exampl
         table.insert(result, match);
     end
     return result;
+end
+
+function miscUtils.isVersionAtLeast(version, minimum)
+    local function parse(value)
+        local major, minor, patch = tostring(value):match("^(%d+)%.(%d+)%.(%d+)$")
+        if not major then return nil end
+        return { tonumber(major), tonumber(minor), tonumber(patch) }
+    end
+
+    local actual = parse(version)
+    local required = parse(minimum)
+    if not actual or not required then return false end
+
+    for i = 1, 3 do
+        if actual[i] ~= required[i] then
+            return actual[i] > required[i]
+        end
+    end
+    return true
 end
 
 return miscUtils

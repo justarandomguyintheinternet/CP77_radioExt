@@ -10,6 +10,7 @@
 local minR4Version = "0.9.0"
 local initializationError = true
 local audio = require("modules/utils/audioEngine")
+local utils = require("modules/utils/utils")
 
 local radio = {
     runtimeData = {
@@ -27,14 +28,15 @@ local radio = {
 
 function radio:new()
     registerForEvent("onInit", function()
-        math.randomseed(os.clock()) -- Prevent predictable random() behavior
+        math.randomseed(os.time())
 
         if not RadioExt then
             print("[RadioExt] Error: Red4Ext part of the mod is missing")
             return
         end
-        if tostring(RadioExt.GetVersion()) < minR4Version then
-            print("[RadioExt] Red4Ext Part version mismatch: Version is " .. RadioExt.GetVersion() .. " Expected: " .. minR4Version .. " or newer")
+        local r4Version = tostring(RadioExt.GetVersion())
+        if not utils.isVersionAtLeast(r4Version, minR4Version) then
+            print("[RadioExt] Red4Ext Part version mismatch: Version is " .. r4Version .. " Expected: " .. minR4Version .. " or newer")
             return
         end
 

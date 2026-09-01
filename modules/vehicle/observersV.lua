@@ -13,20 +13,22 @@ local function getNextStationIndex(currentStation)
         currentStation = RadioStationDataProvider.GetRadioStationUIIndex(currentStation)
     end
 
+    local stations = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())
+
     -- Figure out index of station in list of stations
     local cIndex = 0
-    for index, station in pairs(VehiclesManagerDataHelper.GetRadioStations(GetPlayer())) do
+    for index, station in pairs(stations) do
         if station.record:Index() == currentStation then
             cIndex = index
         end
     end
 
     local nextStation = cIndex + 1
-    if nextStation > #VehiclesManagerDataHelper.GetRadioStations(GetPlayer()) then
+    if nextStation > #stations then
         nextStation = 2
     end
 
-    nextStation = VehiclesManagerDataHelper.GetRadioStations(GetPlayer())[nextStation].record:Index()
+    nextStation = stations[nextStation].record:Index()
 
     if nextStation < 14 then
         nextStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(nextStation))
