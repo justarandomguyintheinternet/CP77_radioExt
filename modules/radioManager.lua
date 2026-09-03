@@ -31,6 +31,8 @@ function radioManager:new(radioMod)
 end
 
 local function isValidExtension(extension)
+    if not extension then return false end
+
     for _, ext in pairs(extensions) do
         if string.lower(extension) == ("." .. ext) then
             return true
@@ -151,21 +153,19 @@ function radioManager:loadRadios() -- Loads radios
         if not config.fileExists("radios/" .. path .. "/metadata.json") then
             print("[RadioExt] Could not find metadata.json file in \"radios/" .. path .. "\"")
         else
-            local songs = self:getSongLengths(path)
-            local metadata
-            local success = pcall(function ()
-                metadata = config.loadFile("radios/" .. path .. "/metadata.json")
-            end)
-
-            if success then
+            local success, loadError = pcall(function ()
+                local songs = self:getSongLengths(path)
+                local metadata = config.loadFile("radios/" .. path .. "/metadata.json")
                 self:backwardsCompatibility(metadata, path)
 
                 local r = require("modules/radioStation"):new(self.rm)
 
                 r:load(metadata, songs, path, #self.radios + 1)
                 self.radios[#self.radios + 1] = r
-            else
-                print("[RadioExt] Error: Failed to load the metadata.json file for \"" .. path .. "\". Make sure the file is valid.")
+            end)
+
+            if not success then
+                print("[RadioExt] Error: Failed to load station \"" .. path .. "\": " .. tostring(loadError))
             end
         end
     end
