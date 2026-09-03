@@ -15,8 +15,7 @@ local utils = require("modules/utils/utils")
 local radio = {
     runtimeData = {
         inMenu = false,
-        inGame = false,
-        time = nil
+        inGame = false
     },
     GameUI = require("modules/utils/GameUI"),
     config = require("modules/utils/config"),

@@ -17,7 +17,6 @@ function radio:new(radioMod)
     o.icon = nil
     o.volume = nil
     o.tdbName = nil
-    o.path = nil
 
     o.simCron = nil
     o.tick = 0

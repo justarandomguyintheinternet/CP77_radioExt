@@ -70,7 +70,7 @@ function observersV.init(radioMod)
             return (a.fm or 0) < (b.fm or 0)
         end)
 
-        local stations = {}
+        stations = {}
         stations[1] = RadioListItemData.new({ record = TweakDBInterface.GetRadioStationRecord("RadioStation.NoStation") }) -- Add NoStation
 
         for _, v in pairs(sorted) do -- Get rid of nested table structure
@@ -84,18 +84,21 @@ function observersV.init(radioMod)
     Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, station, wrapped)
         radioMod.logger.log("QuickSlotsManager::SendRadioEvent")
         if station > 13 then
-            if GetMountedVehicle(GetPlayer()) then
+            local vehicle = GetMountedVehicle(GetPlayer())
+
+            if vehicle then
                 this.Player:QueueEventForEntityID(this.PlayerVehicleID, VehicleRadioEvent.new({ toggle = false, setStation = false, station = -1 })) -- Goes to the vehicle radio if there is any, disabling it
             end
-            if not GetMountedVehicle(GetPlayer()) or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
+            if not vehicle or GetPlayer():GetPocketRadio().settings:GetSyncToCarRadio() then
                 this.Player:QueueEvent(VehicleRadioEvent.new({ toggle = toggle, setStation = setStation, station = station })) -- Goes to PocketRadio::HandleVehicleRadioEvent
             end
 
             Cron.After(0.1, function ()
-                if GetMountedVehicle(GetPlayer()) then
-                    GetMountedVehicle(GetPlayer()):GetVehicleComponent().radioState = true
-                    GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
-                end
+                local vehicle = GetMountedVehicle(GetPlayer())
+                if not vehicle then return end
+
+                vehicle:GetVehicleComponent().radioState = true
+                vehicle:GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
             end)
         else
             wrapped(toggle, setStation, station)
@@ -249,7 +252,7 @@ function observersV.init(radioMod)
     end)
 
     -- TODO: Make this properly change the station, also for custom ones
-    Observe("VehicleObject", "NextRadioReceiverStation", function (this, wrapped)
+    Observe("VehicleObject", "NextRadioReceiverStation", function (this)
         radioMod.logger.log("VehicleObject::NextRadioReceiverStation")
         radioMod.radioManager.managerV:disableCustomRadio()
     end)

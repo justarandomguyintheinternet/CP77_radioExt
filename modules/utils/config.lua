@@ -16,9 +16,9 @@ end
 
 function config.loadFile(path)
     local file = io.open(path, "r")
-    local config = json.decode(file:read("*a"))
+    local data = json.decode(file:read("*a"))
     file:close()
-    return config
+    return data
 end
 
 function config.saveFile(path, data)
@@ -46,18 +46,6 @@ function config.saveFile(path, data)
     end
 
     return true
-end
-
-function config.backwardComp(path, data)
-    local f = config.loadFile(path)
-
-    for k, e in pairs(data) do
-        if f[k] == nil then
-            f[k] = e
-        end
-    end
-
-    config.saveFile(path, f)
 end
 
 return config
