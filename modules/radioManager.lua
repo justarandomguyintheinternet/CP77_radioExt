@@ -91,6 +91,10 @@ local function coerceToType(value, default)
         return tonumber(value)
     elseif type(default) == "string" and type(value) == "number" then
         return tostring(value)
+    elseif type(default) == "boolean" and type(value) == "string" then
+        local normalized = string.lower(value)
+        if normalized == "true" then return true end
+        if normalized == "false" then return false end
     end
 
     return nil

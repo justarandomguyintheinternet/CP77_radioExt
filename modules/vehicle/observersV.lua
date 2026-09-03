@@ -305,14 +305,20 @@ function observersV.init(radioMod)
                 radioMod.radioManager.managerV:switchToRadio(radio)
             end)
             Cron.After(0.5, function ()
-                GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
-                GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
+                local vehicle = GetMountedVehicle(GetPlayer())
+                if not vehicle then return end
+
+                vehicle:GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, cRadio.station)
+                vehicle:GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, true)
             end)
             radioMod.radioManager:updateVRadioVolume()
         else
             Cron.After(0.5, function ()
+                local vehicle = GetMountedVehicle(GetPlayer())
+                if not vehicle then return end
+
                 if GetPlayer():GetPocketRadio().isOn then
-                    GetMountedVehicle(GetPlayer()):GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, GetPlayer():GetPocketRadio():GetStationName())
+                    vehicle:GetBlackboard():SetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName, GetPlayer():GetPocketRadio():GetStationName())
                 end
             end)
         end

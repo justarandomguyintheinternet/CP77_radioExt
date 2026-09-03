@@ -117,7 +117,7 @@ function radio:startRadioSimulation()
     self.tick = math.random(math.max(1, math.floor(self.currentSong.length - 15)))
     table.remove(self.shuffelBag, 1)
 
-    -- TODO: Make this less stupid and more accurate, currently up to a second off, causing error on cpp side due to channel being invalid / ended
+    -- TODO: Make this less stupid and more accurate, currently up to a second off, causing error on cpp side due to channel being invalid / ended. Once this is not cron based, halt all cron timers on session end
     self.simCron = Cron.Every(1, function ()
         if self.tick >= self.currentSong.length then
             self:currentSongDone()

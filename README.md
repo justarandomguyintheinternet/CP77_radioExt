@@ -94,8 +94,8 @@ A mod for CP2077 that allows for the addition of radio stations.
 - This means the `metadata.json` file is corrupted / not valid. Usually caused by missing brackets, commas or parentheses. Can also be caused by not properly escaped characters. Make sure to use a text editor with syntax highlighting / JSON validation.
 > `"[RadioExt] Warning: The file "songFile.mp3" requested for the ordering of station "Station Name" was not found."`
 - Make sure the file you specified in the `order` field does exist and that its filename is spelled properly
->`"[RadioExt] Error: Station "Station Name" is not a stream, but also has no song files. Using fallback webstream instead."`
-- This happens if there are no song files in a station's folder, but the `isStream` flag in its `metadata.json` file is also not set to `true`
+>`"[RadioExt] Error: Station "Station Name" is not a stream, but also has no song files."`
+- This happens if there are no supported song files in a station's folder and the `isStream` flag in its `metadata.json` file is not set to `true`. Add at least one supported audio file, or set `isStream` to `true` and provide a valid `streamURL`.
 >`[RadioExt] Error: All channels used (Too many radios)`
 - This happens if there are more physical radios playing a custom station than there are audio channels reserved by the mod (Currently 64, so this is extremely unlikely to ever happen)
 
