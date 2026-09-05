@@ -61,18 +61,22 @@ function observersP.init(radioMod)
         end
     end)
 
-    Override("RadioControllerPS", "GameAttached", function (this)
+    ObserveAfter("RadioControllerPS", "GameAttached", function (this)
         this.amountOfStations = 14 + #radioMod.radioManager.radios
-        this.activeChannelName = RadioStationDataProvider.GetChannelName(this:GetActiveRadioStation())
-        this:TryInitializeInteractiveState()
     end)
 
-    Override("RadioControllerPS", "SetDefaultRadioStation", function (this)
-        if not this.radioSetup.randomizeStartingStation then
-            this.activeStation = this.radioSetup.startingStation
-            return
+    Override("RadioControllerPS", "GetStartingStation", function (this, wrapped)
+        local customStationCount = #radioMod.radioManager.radios
+        if not this.radioSetup.randomizeStartingStation or customStationCount == 0 then
+            return wrapped()
         end
-        this.activeStation = math.random(0, 13 + #radioMod.radioManager.radios)
+
+        local station = math.random(13 + customStationCount)
+        if station <= 13 then
+            return wrapped()
+        end
+
+        return station
     end)
 
     Observe("Radio", "PlayGivenStation", function (this)

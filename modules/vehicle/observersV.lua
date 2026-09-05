@@ -132,6 +132,8 @@ function observersV.init(radioMod)
     -- Selecting a radio from the radiolist
     Override("VehicleRadioPopupGameController", "Activate", function (this, wrapped)
         radioMod.logger.log("VehicleRadioPopupGameController::Activate")
+        if not IsDefined(this.selectedItem) then return end
+
         local name = this.selectedItem:GetStationData().record:DisplayName()
         local radio = radioMod.radioManager:getRadioByName(name)
 
@@ -156,14 +158,17 @@ function observersV.init(radioMod)
     Override("VehicleComponent", "OnRadioToggleEvent", function (this, evt, wrapped)
         radioMod.logger.log("VehicleComponent::OnRadioToggleEvent")
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
+        local vehicle = this:GetVehicle()
+
+        if not vehicle then return wrapped(evt) end
 
         if activeVRadio then -- Toggle off
             radioMod.radioManager.managerV:disableCustomRadio()
             this.vehicleBlackboard:SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, false)
-            this:GetVehicle():ToggleRadioReceiver(false)
+            vehicle:ToggleRadioReceiver(false)
             return
         else
-            local name = GetMountedVehicle(GetPlayer()):GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName) -- Get current radio name
+            local name = vehicle:GetBlackboard():GetName(GetAllBlackboardDefs().Vehicle.VehRadioStationName) -- Get current radio name
 
             if GetLocalizedTextByKey(name) ~= "" then
                 name = GetLocalizedTextByKey(name)
@@ -261,6 +266,7 @@ function observersV.init(radioMod)
     Override("PocketRadio", "HandleRadioToggleEvent", function (this, evt, wrapped)
         radioMod.logger.log("PocketRadio::HandleRadioToggleEvent")
         if not this.settings:GetCycleButtonPress() then return wrapped(evt) end
+        if this:IsRestricted() or this:ShouldIgnoreEvents() then return end
 
         local nextStation = getNextStationIndex(this.station)
 
