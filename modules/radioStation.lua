@@ -95,12 +95,13 @@ function radio:load(metadata, lengthData, path, index) -- metadata is the data p
     self:setupRecord(metadata, path)
     self:verifyOrder()
 
-    if #self.songs == 0 and not self.metadata.streamInfo.isStream then
-        print("[RadioExt] Error: Station \"" .. self.name .. "\" is not a stream, but also has no song files.")
-    end
-
     if not self.metadata.streamInfo.isStream then
-        self:startRadioSimulation()
+        if #self.songs == 0 then
+            print("[RadioExt] Warning: Station \"" .. self.name .. "\" is not a stream and has no song files.")
+            self.currentSong = { path = self.path .. "\\No songs.mp3", length = 0 }
+        else
+            self:startRadioSimulation()
+        end
     else
         self.currentSong = { path = self.name, length = 0 } -- Used for the "playing now" HUD element
     end
@@ -138,7 +139,9 @@ function radio:activate(channel, updateUI)
 
     self.channels[channel] = true
     if not self.metadata.streamInfo.isStream then
-        audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
+        if #self.songs > 0 then
+            audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
+        end
     else
         audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end

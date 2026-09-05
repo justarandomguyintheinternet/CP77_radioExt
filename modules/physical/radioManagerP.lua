@@ -56,12 +56,15 @@ function managerP:removeObjectByHandle(handle)
 end
 
 function managerP:update()
-	for _, object in pairs(self.radioObjects) do
+	for channelID, object in pairs(self.radioObjects) do
 		object.radio:activate(object.channelID)
-		object:update()
+		if not object:update() then
+			object:uninit()
+			self.radioObjects[channelID] = nil
+		end
 	end
 
-	if #self.radioObjects == 0 then return end
+	if next(self.radioObjects) == nil then return end
 
 	Game.GetCameraSystem():GetActiveCameraWorldTransform(self.cameraTransform)
 	RadioExt.SetListener(self.cameraTransform.position, GetPlayer():GetWorldForward(), GetPlayer():GetWorldUp())

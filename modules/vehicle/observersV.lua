@@ -7,6 +7,15 @@ local observersV = {
     input = false
 }
 
+local function getTrackName(path, isStream)
+    path = tostring(path or "")
+    if isStream then return path end
+
+    local segments = utils.split(path, "\\")
+    local fileName = segments[#segments] or path
+    return fileName:match("(.+)%..+$") or fileName
+end
+
 local function getNextStationIndex(currentStation)
     -- Convert vanilla station to UI index (Same as what is stored in station record)
     if currentStation < 14 and currentStation ~= -1 then
@@ -51,11 +60,7 @@ function observersV.init(radioMod)
             local fm = string.gsub(GetLocalizedText(v.record:DisplayName()), ",", ".")
 
             local split = utils.split(fm, " ")
-            if tonumber(split[1]) then
-                fm = tonumber(split[1])
-            else
-                fm = tonumber(split[#split])
-            end
+            fm = tonumber(split[1]) or tonumber(split[#split]) or 0
 
             if GetLocalizedText(v.record:DisplayName()) == "Enable Aux Radio" then fm = 0 end
 
@@ -246,11 +251,7 @@ function observersV.init(radioMod)
         local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         if not activeVRadio then return end
 
-        local path = activeVRadio.track
-        if not activeVRadio.isStream then
-            path = utils.split(path, "\\")[2]
-            path = path:match("(.+)%..+$")
-        end
+        local path = getTrackName(activeVRadio.track, activeVRadio.isStream)
 
         this.trackName:SetText(path)
         this.trackName:SetVisible(true)
@@ -311,7 +312,9 @@ function observersV.init(radioMod)
             Cron.After(0.1, function ()
                 GetPlayer():GetQuickSlotsManager():SendRadioEvent(true, true, cRadio.index)
                 Game.GetUISystem():QueueEvent(VehicleRadioSongChanged.new())
-                radioMod.radioManager.managerV:switchToRadio(radio)
+                if radio then
+                    radioMod.radioManager.managerV:switchToRadio(radio)
+                end
             end)
             Cron.After(0.5, function ()
                 local vehicle = GetMountedVehicle(GetPlayer())
@@ -364,11 +367,7 @@ function observersV.init(radioMod)
 
         inkTextRef.SetText(this.radioStationName, activeVRadio.station)
 
-        local path = activeVRadio.track
-        if not activeVRadio.isStream then
-            path = utils.split(path, "\\")[2]
-            path = path:match("(.+)%..+$")
-        end
+        local path = getTrackName(activeVRadio.track, activeVRadio.isStream)
 
         inkTextRef.SetText(this.subText, path)
     end)

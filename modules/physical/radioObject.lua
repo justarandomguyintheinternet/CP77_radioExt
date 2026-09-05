@@ -32,7 +32,12 @@ function object:switchToRadio(radio)
 end
 
 function object:update()
+    if not IsDefined(self.handle) then
+        return false
+    end
+
     RadioExt.SetChannelPos(self.channelID, self.handle:GetWorldPosition())
+    return true
 end
 
 return object

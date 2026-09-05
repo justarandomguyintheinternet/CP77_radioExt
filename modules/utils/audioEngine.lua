@@ -3,13 +3,13 @@ local GameSettings = require("modules/utils/GameSettings")
 local maxRequestInterval = 1.0
 
 local audio = {
-    timeSinceLastPlayed = maxRequestInterval + 1
+    timeSinceLastPlayedByChannel = {}
 }
 
 local function getAdjustedVolume(channel, volume)
-    local mult = GameSettings.Get("/audio/volume/RadioportVolume")
+    local mult = GameSettings.Get("/audio/volume/RadioportVolume") or 100
     if GetPlayer():GetMountedVehicle() then
-        mult = GameSettings.Get("/audio/volume/CarRadioVolume")
+        mult = GameSettings.Get("/audio/volume/CarRadioVolume") or 100
     end
     if channel == -1 then
         volume = volume * (mult / 100)
@@ -20,15 +20,18 @@ local function getAdjustedVolume(channel, volume)
 end
 
 function audio.update(deltaTime)
-    audio.timeSinceLastPlayed = audio.timeSinceLastPlayed + deltaTime
+    for channel, timeSinceLastPlayed in pairs(audio.timeSinceLastPlayedByChannel) do
+        audio.timeSinceLastPlayedByChannel[channel] = timeSinceLastPlayed + deltaTime
+    end
 end
 
 function audio.playFile(id, path, time, volume, fade)
-    if audio.timeSinceLastPlayed < maxRequestInterval then
+    local timeSinceLastPlayed = audio.timeSinceLastPlayedByChannel[id] or maxRequestInterval + 1
+    if timeSinceLastPlayed < maxRequestInterval then
         return
     end
 
-    audio.timeSinceLastPlayed = 0
+    audio.timeSinceLastPlayedByChannel[id] = 0
     fade = fade or 0.75
     RadioExt.Play(id, path, time, getAdjustedVolume(id, volume), fade)
 end
