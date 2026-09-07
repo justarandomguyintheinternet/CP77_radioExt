@@ -303,7 +303,7 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
     std::filesystem::path subDir = pathFromUtf8(path.c_str());
     std::filesystem::path target = gameBinDir / subDir;
     const std::string targetUtf8 = pathToUtf8(target);
-    sdk->logger->InfoF(handle, "GetFolders(%s)", targetUtf8.c_str());
+    sdk->logger->DebugF(handle, "GetFolders(%s)", targetUtf8.c_str());
 
     RED4ext::DynArray<RED4ext::CString> folders;
 
@@ -383,8 +383,6 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aO
     RED4ext::GetParameter(aFrame, &startPos);
     RED4ext::GetParameter(aFrame, &volume);
     RED4ext::GetParameter(aFrame, &fade);
-    sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
-
     if (!normalizeChannelID(channelID))
     {
         aFrame->code++; // skip ParamEnd
@@ -413,7 +411,9 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aO
 
     stopAndReleaseChannel(channelID);
 
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(targetUtf8.c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
+    logError(pSystem->createStream(targetUtf8.c_str(), mode | FMOD_NONBLOCKING, nullptr,
+                                   &loadData[channelID]->sound),
+             "FMOD::System::createStream");
 
     loadData[channelID]->fade = fade;
     loadData[channelID]->startPos = startPos;
@@ -434,8 +434,6 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, voi
     float volume;
     RED4ext::GetParameter(aFrame, &channelID);
     RED4ext::GetParameter(aFrame, &volume);
-    sdk->logger->InfoF(handle, "SetVolume(%i, %f)", channelID, volume);
-
     volume = max(0, volume);
     if (!normalizeChannelID(channelID))
     {
@@ -445,7 +443,7 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, voi
 
     if (pChannels[channelID])
     {
-        sdk->logger->InfoF(handle, "FMOD::Channel::setVolume: %s", FMOD_ErrorString(pChannels[channelID]->setVolume(volume)));
+        logError(pChannels[channelID]->setVolume(volume), "FMOD::Channel::setVolume");
     }
 
     aFrame->code++; // skip ParamEnd
@@ -459,9 +457,7 @@ void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
 
     float falloff;
     RED4ext::GetParameter(aFrame, &falloff);
-    sdk->logger->InfoF(handle, "Set3DFalloff(%f)", falloff);
-
-    sdk->logger->InfoF(handle, "FMOD::System::set3DSettings: %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, falloff)));
+    logError(pSystem->set3DSettings(1, 1, falloff), "FMOD::System::set3DSettings");
 
     aFrame->code++; // skip ParamEnd
 }
@@ -504,7 +500,6 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aO
     }
 
     stopAndReleaseChannel(channelID);
-    sdk->logger->InfoF(handle, "Stopped channel %i", channelID);
 
     aFrame->code++; // skip ParamEnd
 }
@@ -619,7 +614,7 @@ void checkSoundLoad()
                 mode |= FMOD_3D_INVERSETAPEREDROLLOFF;
             }
 
-            sdk->logger->InfoF(handle, "FMOD::Sound::setMode: %s", FMOD_ErrorString(loadData[i]->sound->setMode(mode)));
+            logError(loadData[i]->sound->setMode(mode), "FMOD::Sound::setMode");
             if (mode & FMOD_3D)
             {
                 logError(loadData[i]->sound->set3DMinMaxDistance(1, 10), "set3DMinMaxDistance");
@@ -644,8 +639,8 @@ void checkSoundLoad()
                 continue;
             }
 
-            sdk->logger->InfoF(handle, "FMOD::Channel::setPosition: %s", FMOD_ErrorString(pChannels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
-            sdk->logger->InfoF(handle, "FMOD::Channel::setVolume: %s", FMOD_ErrorString(pChannels[i]->setVolume(volume)));
+            logError(pChannels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS), "FMOD::Channel::setPosition");
+            logError(pChannels[i]->setVolume(volume), "FMOD::Channel::setVolume");
 
             setFadeIn(pChannels[i], loadData[i]->fade);
         } else if(state == FMOD_OPENSTATE_ERROR) {
@@ -723,7 +718,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
         }
 
         systemInitialized = true;
-        sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.325)));
+        logError(pSystem->set3DSettings(1, 1, 0.325), "FMOD::System::set3DSettings");
 
         for (int i = 0; i <= channelCount; i++)
         {
