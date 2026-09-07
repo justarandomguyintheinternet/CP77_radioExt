@@ -14,9 +14,10 @@
 const RED4ext::v1::Sdk* sdk;
 RED4ext::v1::PluginHandle handle;
 std::filesystem::path root;
-FMOD::System* pSystem;
-FMOD::Channel* pChannels[CHANNELS + 1]; // Channels, 0 is reserved for vehicle radio
-SoundLoadData* loadData[CHANNELS + 1]; // For temporarily storing the data of a channel, while the sound loads
+FMOD::System* pSystem = nullptr;
+FMOD::Channel* pChannels[CHANNELS + 1]{}; // Channels, 0 is reserved for vehicle radio
+SoundLoadData* loadData[CHANNELS + 1]{}; // For temporarily storing the data of a channel, while the sound loads
+bool systemInitialized = false;
 std::unordered_map<std::string, uint32_t> failedConnections;
 
 // General purpose functions
@@ -52,7 +53,7 @@ RED4ext::CClass* RadioExt::GetNativeType()
     return &cls;
 }
 
-RED4EXT_C_EXPORT void RED4EXT_CALL RegisterTypes()
+void RegisterTypes()
 {
     RED4ext::CNamePool::Add("RadioExt");
 
@@ -60,7 +61,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL RegisterTypes()
     RED4ext::CRTTISystem::Get()->RegisterType(&cls);
 }
 
-RED4EXT_C_EXPORT void RED4EXT_CALL PostRegisterTypes()
+void PostRegisterTypes()
 {
     auto rtti = RED4ext::CRTTISystem::Get();
     auto scriptable = rtti->GetClass("IScriptable");
@@ -84,6 +85,53 @@ void logError(FMOD_RESULT result, const char* msg)
     if (result != FMOD_OK)
     {
         sdk->logger->ErrorF(handle, "%s: %s", msg, FMOD_ErrorString(result));
+    }
+}
+
+bool normalizeChannelID(int32_t& channelID)
+{
+    if (channelID == -1)
+    {
+        channelID = 0;
+        return true;
+    }
+
+    if (channelID < 0 || channelID > CHANNELS)
+    {
+        sdk->logger->ErrorF(handle, "Invalid channel ID: %i", channelID);
+        return false;
+    }
+
+    return true;
+}
+
+void stopAndReleaseChannel(int32_t channelID)
+{
+    if (loadData[channelID])
+    {
+        loadData[channelID]->play = false;
+    }
+
+    if (pChannels[channelID])
+    {
+        logError(pChannels[channelID]->stop(), "FMOD::Channel::stop");
+        pChannels[channelID] = nullptr;
+    }
+
+    if (loadData[channelID] && loadData[channelID]->sound)
+    {
+        logError(loadData[channelID]->sound->release(), "FMOD::Sound::release");
+        loadData[channelID]->sound = nullptr;
+    }
+}
+
+void releaseChannelData()
+{
+    for (int i = 0; i <= CHANNELS; i++)
+    {
+        stopAndReleaseChannel(i);
+        delete loadData[i];
+        loadData[i] = nullptr;
     }
 }
 
@@ -150,15 +198,28 @@ void registerAudioFunctions(RED4ext::CRTTISystem* rtti)
     cls.RegisterFunction(setMinMax);
 }
 
-void setFadeIn(FMOD::System* pSystem, FMOD::Channel* pChannel, float duration) {
+void setFadeIn(FMOD::Channel* pChannel, float duration) {
     logError(pChannel->setPaused(true), "setPaused(true)");
 
-    unsigned long long dspclock;
-    int rate;
-    FMOD_RESULT result;
+    FMOD::System* channelSystem = nullptr;
+    FMOD_RESULT result = pChannel->getSystemObject(&channelSystem);
+    logError(result, "getSystemObject");
+    if (result != FMOD_OK || !channelSystem)
+    {
+        logError(pChannel->setPaused(false), "setPaused(false)");
+        return;
+    }
 
-    logError(pChannel->getSystemObject(&pSystem), "getSystemObject");
-    logError(pSystem->getSoftwareFormat(&rate, 0, 0), "getSoftwareFormat");
+    int rate = 0;
+    result = channelSystem->getSoftwareFormat(&rate, nullptr, nullptr);
+    logError(result, "getSoftwareFormat");
+    if (result != FMOD_OK)
+    {
+        logError(pChannel->setPaused(false), "setPaused(false)");
+        return;
+    }
+
+    unsigned long long dspclock = 0;
     logError(pChannel->getDSPClock(0, &dspclock), "getDSPClock");
     logError(pChannel->addFadePoint(dspclock, 0.0f), "addFadePoint");
     logError(pChannel->addFadePoint(dspclock + (rate * duration), 1.0f), "addFadePoint");
@@ -177,12 +238,21 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
 
     unsigned int length = 0;
 
-    FMOD::Sound* sound;
+    FMOD::Sound* sound = nullptr;
     FMOD_RESULT error = pSystem->createSound(target.string().c_str(), FMOD_CREATESTREAM, nullptr, &sound);
     // Only log if there is an error, as this gets called for allll the songs
     if (error != FMOD_OK)
     {
         sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
+
+        if (aOut)
+        {
+            auto type = RED4ext::CRTTISystem::Get()->GetType("Int32");
+            type->Assign(aOut, &length);
+        }
+
+        aFrame->code++; // skip ParamEnd
+        return;
     }
 
     error = sound->getLength(&length, FMOD_TIMEUNIT_MS);
@@ -190,6 +260,8 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     {
         sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
     }
+
+    logError(sound->release(), "FMOD::Sound::release");
 
     if (aOut)
     {
@@ -214,12 +286,19 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
 
     RED4ext::DynArray<RED4ext::CString> folders;
 
-    for (const auto& entry : std::filesystem::directory_iterator(target))
+    try
     {
-        if (entry.is_directory())
+        for (const auto& entry : std::filesystem::directory_iterator(target))
         {
-            folders.PushBack(entry.path().filename().string());
+            if (entry.is_directory())
+            {
+                folders.PushBack(entry.path().filename().string());
+            }
         }
+    }
+    catch (const std::filesystem::filesystem_error& error)
+    {
+        sdk->logger->ErrorF(handle, "Failed to enumerate radio folders at %s: %s", target.string().c_str(), error.what());
     }
 
     if (aOut)
@@ -280,7 +359,7 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     RED4ext::GetParameter(aFrame, &fade);
     sdk->logger->InfoF(handle, "Play(%i, \"%s\", %i, %f, %f)", channelID, path.c_str(), startPos, volume, fade);
 
-    if (loadData[channelID]->play == true)
+    if (!normalizeChannelID(channelID))
     {
         aFrame->code++; // skip ParamEnd
         return;
@@ -303,24 +382,16 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
         }
     }
 
-    FMOD_MODE mode = FMOD_3D;
-    if (channelID == -1)
-    {
-        mode = FMOD_DEFAULT;
-    }
+    FMOD_MODE mode = channelID == 0 ? FMOD_2D : FMOD_3D;
 
-    if (channelID == -1)
-    {
-        channelID = 0;
-    }
-
-    channelID = min(CHANNELS, channelID);
+    stopAndReleaseChannel(channelID);
 
     sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(target.string().c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
 
     loadData[channelID]->fade = fade;
     loadData[channelID]->startPos = startPos;
     loadData[channelID]->volume = volume;
+    loadData[channelID]->mode = mode;
     loadData[channelID]->play = true; // Sound is loading, check if loading has finished
     loadData[channelID]->path = target.string();
     aFrame->code++; // skip ParamEnd
@@ -338,11 +409,10 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
     sdk->logger->InfoF(handle, "SetVolume(%i, %f)", channelID, volume);
 
     volume = max(0, volume);
-    channelID = min(CHANNELS, channelID);
-
-    if (channelID == -1)
+    if (!normalizeChannelID(channelID))
     {
-        channelID = 0;
+        aFrame->code++; // skip ParamEnd
+        return;
     }
 
     if (pChannels[channelID])
@@ -397,21 +467,14 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     int32_t channelID;
     RED4ext::GetParameter(aFrame, &channelID);
 
-    channelID = min(CHANNELS, channelID);
-
-    if (channelID == -1)
+    if (!normalizeChannelID(channelID))
     {
-        channelID = 0;
+        aFrame->code++; // skip ParamEnd
+        return;
     }
 
-    loadData[channelID]->play = false;
-
-    if (pChannels[channelID])
-    {
-        logError(pChannels[channelID]->stop(), "FMOD::Channel*->stop()");
-        pChannels[channelID] = nullptr;
-        sdk->logger->InfoF(handle, "Stopped channel %i", channelID);
-    }
+    stopAndReleaseChannel(channelID);
+    sdk->logger->InfoF(handle, "Stopped channel %i", channelID);
 
     aFrame->code++; // skip ParamEnd
 }
@@ -426,11 +489,10 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
     RED4ext::GetParameter(aFrame, &channelID);
     RED4ext::GetParameter(aFrame, &pos);
 
-    channelID = min(CHANNELS, channelID);
-
-    if (channelID == -1)
+    if (!normalizeChannelID(channelID))
     {
-        channelID = 0;
+        aFrame->code++; // skip ParamEnd
+        return;
     }
 
     FMOD_VECTOR posF;
@@ -505,21 +567,31 @@ void checkSoundLoad()
             continue;
         }
 
-        FMOD_OPENSTATE state;
+        FMOD_OPENSTATE state = FMOD_OPENSTATE_ERROR;
         FMOD_RESULT result = loadData[i]->sound->getOpenState(&state, 0, 0, 0);
 
         if (result != FMOD_OK)
         {
             logError(result, "getOpenState");
-            loadData[i]->play = false;
+            stopAndReleaseChannel(i);
+            continue;
         }
 
         if (state == FMOD_OPENSTATE_READY)
         {
             loadData[i]->play = false;
 
-            sdk->logger->InfoF(handle, "FMOD::Sound::setMode: %s", FMOD_ErrorString(loadData[i]->sound->setMode(FMOD_3D_INVERSETAPEREDROLLOFF)));
-            logError(loadData[i]->sound->set3DMinMaxDistance(1, 10), "set3DMinMaxDistance");
+            FMOD_MODE mode = loadData[i]->mode;
+            if (mode & FMOD_3D)
+            {
+                mode |= FMOD_3D_INVERSETAPEREDROLLOFF;
+            }
+
+            sdk->logger->InfoF(handle, "FMOD::Sound::setMode: %s", FMOD_ErrorString(loadData[i]->sound->setMode(mode)));
+            if (mode & FMOD_3D)
+            {
+                logError(loadData[i]->sound->set3DMinMaxDistance(1, 10), "set3DMinMaxDistance");
+            }
 
             unsigned int lengthMs = 0;
             logError(loadData[i]->sound->getLength(&lengthMs, FMOD_TIMEUNIT_MS), "getLength");
@@ -527,11 +599,23 @@ void checkSoundLoad()
 
             float volume = max(0, loadData[i]->volume);
 
-            sdk->logger->InfoF(handle, "FMOD::System::playSound: %s", FMOD_ErrorString(pSystem->playSound(loadData[i]->sound, nullptr, false, &pChannels[i])));
+            FMOD_RESULT result = pSystem->playSound(loadData[i]->sound, nullptr, false, &pChannels[i]);
+            logError(result, "FMOD::System::playSound");
+            if (result != FMOD_OK || !pChannels[i])
+            {
+                if (result == FMOD_OK)
+                {
+                    sdk->logger->ErrorF(handle, "%s", "FMOD::System::playSound returned a null channel");
+                }
+
+                stopAndReleaseChannel(i);
+                continue;
+            }
+
             sdk->logger->InfoF(handle, "FMOD::Channel::setPosition: %s", FMOD_ErrorString(pChannels[i]->setPosition(startPos, FMOD_TIMEUNIT_MS)));
             sdk->logger->InfoF(handle, "FMOD::Channel::setVolume: %s", FMOD_ErrorString(pChannels[i]->setVolume(volume)));
 
-            setFadeIn(pSystem, pChannels[i], loadData[i]->fade);
+            setFadeIn(pChannels[i], loadData[i]->fade);
         } else if(state == FMOD_OPENSTATE_ERROR) {
             if (failedConnections.contains(loadData[i]->path))
             {
@@ -545,6 +629,7 @@ void checkSoundLoad()
             sdk->logger->ErrorF(
                 handle, "Failed to load sound for channel %i. This has been attempt number %i for that resource.", i,
                 failedConnections[loadData[i]->path]);
+            stopAndReleaseChannel(i);
         }
     }
 }
@@ -556,6 +641,11 @@ bool Running_OnEnter(RED4ext::CGameApplication* aApp)
 
 bool Running_OnUpdate(RED4ext::CGameApplication* aApp)
 {
+    if (!systemInitialized || !pSystem || !loadData[0])
+    {
+        return false;
+    }
+
     checkSoundLoad();
     pSystem->update();
     return false;
@@ -563,14 +653,7 @@ bool Running_OnUpdate(RED4ext::CGameApplication* aApp)
 
 bool Running_OnExit(RED4ext::CGameApplication* aApp)
 {
-    for (int i = 0; i <= CHANNELS; i++)
-    {
-        if (pChannels[i])
-        {
-            pChannels[i]->stop();
-        }
-        delete loadData[i];
-    }
+    releaseChannelData();
 
     return true;
 }
@@ -585,14 +668,29 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
         handle = aHandle;
         root = getExePath();
 
-        sdk->logger->InfoF(handle, "FMOD::System_Create %s", FMOD_ErrorString(FMOD::System_Create(&pSystem)));
-        sdk->logger->InfoF(handle, "FMOD::System::init %s", FMOD_ErrorString(pSystem->init(CHANNELS, FMOD_INIT_3D_RIGHTHANDED, nullptr)));
+        FMOD_RESULT result = FMOD::System_Create(&pSystem);
+        logError(result, "FMOD::System_Create");
+        if (result != FMOD_OK || !pSystem)
+        {
+            pSystem = nullptr;
+            return false;
+        }
+
+        result = pSystem->init(CHANNELS + 1, FMOD_INIT_3D_RIGHTHANDED, nullptr);
+        logError(result, "FMOD::System::init");
+        if (result != FMOD_OK)
+        {
+            logError(pSystem->release(), "FMOD::System::release");
+            pSystem = nullptr;
+            return false;
+        }
+
+        systemInitialized = true;
         sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.325)));
 
         for (int i = 0; i <= CHANNELS; i++)
         {
-            loadData[i] = new SoundLoadData;
-            loadData[i]->play = false;
+            loadData[i] = new SoundLoadData{};
         }
 
         RED4ext::v1::GameState updateState;
@@ -608,8 +706,20 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
     }
     case RED4ext::v1::EMainReason::Unload:
     {
-        pSystem->close();
-        pSystem->release();
+        releaseChannelData();
+
+        if (pSystem)
+        {
+            if (systemInitialized)
+            {
+                logError(pSystem->close(), "FMOD::System::close");
+            }
+
+            logError(pSystem->release(), "FMOD::System::release");
+            pSystem = nullptr;
+        }
+
+        systemInitialized = false;
         break;
     }
     }
