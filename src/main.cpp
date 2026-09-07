@@ -4,19 +4,21 @@
 #include <RED4ext/Scripting/Natives/Generated/Vector4.hpp>
 #include <fmod.hpp>
 #include <fmod_errors.h>
+#include <string>
 #include <unordered_map>
+#include <vector>
 #include "SoundLoadData.hpp"
 
-#define RADIOEXT_VERSION "0.9.0"
-#define CHANNELS 64
-#define MAX_LOAD_ATTEMPTS 3
+constexpr RED4ext::v1::SemVer radioExtVersion{2, 3, 0, {}};
+constexpr int32_t channelCount = 64;
+constexpr uint32_t maxLoadAttempts = 3;
 
 const RED4ext::v1::Sdk* sdk;
 RED4ext::v1::PluginHandle handle;
-std::filesystem::path root;
+std::filesystem::path gameBinDir;
 FMOD::System* pSystem = nullptr;
-FMOD::Channel* pChannels[CHANNELS + 1]{}; // Channels, 0 is reserved for vehicle radio
-SoundLoadData* loadData[CHANNELS + 1]{}; // For temporarily storing the data of a channel, while the sound loads
+FMOD::Channel* pChannels[channelCount + 1]{}; // Channels, 0 is reserved for vehicle radio
+SoundLoadData* loadData[channelCount + 1]{}; // For temporarily storing the data of a channel, while the sound loads
 bool systemInitialized = false;
 std::unordered_map<std::string, uint32_t> failedConnections;
 
@@ -28,13 +30,13 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
 void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, int32_t* aOut, int64_t a4);
 
 // Audio playback functions
-void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
-void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4);
+void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
+void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4);
 
 // Red4Ext Stuff
 void registerGeneralFunctions(RED4ext::CRTTISystem* rtti);
@@ -71,13 +73,30 @@ void PostRegisterTypes()
     registerAudioFunctions(rtti);
 }
 
-// Provided by WSSDude / Andrej Redeky
-std::filesystem::path getExePath() {
-    wchar_t exePathBuf[MAX_PATH]{ 0 };
-    GetModuleFileName(GetModuleHandle(nullptr), exePathBuf, std::size(exePathBuf));
-    std::filesystem::path exePath = exePathBuf;
+std::filesystem::path pathFromUtf8(const char* path)
+{
+    const auto begin = reinterpret_cast<const char8_t*>(path);
+    return std::filesystem::path(std::u8string(begin, begin + std::char_traits<char>::length(path)));
+}
 
-    return exePath;
+std::string pathToUtf8(const std::filesystem::path& path)
+{
+    const std::u8string utf8 = path.u8string();
+    return {reinterpret_cast<const char*>(utf8.data()), utf8.size()};
+}
+
+// Provided by WSSDude / Andrej Redeky
+std::filesystem::path getGameBinDir()
+{
+    constexpr DWORD maxPathLength = 32768; // Maximum extended-length path plus the null terminator
+    std::vector<wchar_t> exePathBuf(maxPathLength);
+    const DWORD length = GetModuleFileNameW(nullptr, exePathBuf.data(), maxPathLength);
+    if (length == 0 || length >= maxPathLength)
+    {
+        return {};
+    }
+
+    return std::filesystem::path(exePathBuf.data(), exePathBuf.data() + length).parent_path();
 }
 
 void logError(FMOD_RESULT result, const char* msg)
@@ -96,7 +115,7 @@ bool normalizeChannelID(int32_t& channelID)
         return true;
     }
 
-    if (channelID < 0 || channelID > CHANNELS)
+    if (channelID < 0 || channelID > channelCount)
     {
         sdk->logger->ErrorF(handle, "Invalid channel ID: %i", channelID);
         return false;
@@ -127,7 +146,7 @@ void stopAndReleaseChannel(int32_t channelID)
 
 void releaseChannelData()
 {
-    for (int i = 0; i <= CHANNELS; i++)
+    for (int i = 0; i <= channelCount; i++)
     {
         stopAndReleaseChannel(i);
         delete loadData[i];
@@ -233,17 +252,18 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
 
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
-    std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = root.parent_path() / subDir;
+    std::filesystem::path subDir = pathFromUtf8(path.c_str());
+    std::filesystem::path target = gameBinDir / subDir;
+    const std::string targetUtf8 = pathToUtf8(target);
 
     unsigned int length = 0;
 
     FMOD::Sound* sound = nullptr;
-    FMOD_RESULT error = pSystem->createSound(target.string().c_str(), FMOD_CREATESTREAM, nullptr, &sound);
+    FMOD_RESULT error = pSystem->createSound(targetUtf8.c_str(), FMOD_CREATESTREAM, nullptr, &sound);
     // Only log if there is an error, as this gets called for allll the songs
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
+        sdk->logger->ErrorF(handle, "FMOD::System::createSound: %s. Requested Path: %s", FMOD_ErrorString(error), targetUtf8.c_str());
 
         if (aOut)
         {
@@ -258,7 +278,7 @@ void GetSongLength(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame,
     error = sound->getLength(&length, FMOD_TIMEUNIT_MS);
     if (error != FMOD_OK)
     {
-        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s", FMOD_ErrorString(error), target.string().c_str());
+        sdk->logger->ErrorF(handle, "FMOD::System::getLength: %s. Requested Path: %s", FMOD_ErrorString(error), targetUtf8.c_str());
     }
 
     logError(sound->release(), "FMOD::Sound::release");
@@ -280,9 +300,10 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
     RED4ext::CString path;
     RED4ext::GetParameter(aFrame, &path);
 
-    std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = root.parent_path() / subDir;
-    sdk->logger->InfoF(handle, "GetFolders(%s)", target.string().c_str());
+    std::filesystem::path subDir = pathFromUtf8(path.c_str());
+    std::filesystem::path target = gameBinDir / subDir;
+    const std::string targetUtf8 = pathToUtf8(target);
+    sdk->logger->InfoF(handle, "GetFolders(%s)", targetUtf8.c_str());
 
     RED4ext::DynArray<RED4ext::CString> folders;
 
@@ -292,13 +313,13 @@ void GetFolders(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, RE
         {
             if (entry.is_directory())
             {
-                folders.PushBack(entry.path().filename().string());
+                folders.PushBack(pathToUtf8(entry.path().filename()));
             }
         }
     }
     catch (const std::filesystem::filesystem_error& error)
     {
-        sdk->logger->ErrorF(handle, "Failed to enumerate radio folders at %s: %s", target.string().c_str(), error.what());
+        sdk->logger->ErrorF(handle, "Failed to enumerate radio folders at %s: %s", targetUtf8.c_str(), error.what());
     }
 
     if (aOut)
@@ -315,7 +336,7 @@ void GetNumChannels(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
 
-    int32_t channels = CHANNELS;
+    int32_t channels = channelCount;
 
     if (aOut)
     {
@@ -332,7 +353,11 @@ void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aF
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
 
-    RED4ext::CString version = RADIOEXT_VERSION;
+    const std::string versionString = std::to_string(radioExtVersion.major) + "." +
+                                      std::to_string(radioExtVersion.minor) + "." +
+                                      std::to_string(radioExtVersion.patch);
+    RED4ext::CString version = versionString;
+
     if (aOut)
     {
         auto type = RED4ext::CRTTISystem::Get()->GetType("String");
@@ -342,10 +367,11 @@ void GetRadioExtVersion(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aF
     aFrame->code++; // skip ParamEnd
 }
 
-void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     int32_t channelID;
     RED4ext::CString path;
@@ -365,19 +391,20 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
         return;
     }
 
-    std::filesystem::path subDir = path.c_str();
-    std::filesystem::path target = root.parent_path() / subDir;
+    std::filesystem::path subDir = pathFromUtf8(path.c_str());
+    std::filesystem::path target = gameBinDir / subDir;
+    std::string targetUtf8 = pathToUtf8(target);
 
     if (startPos == -1) // Is a stream
     {
-        target = subDir;
+        targetUtf8 = path.c_str();
     }
 
-    if (failedConnections.contains(target.string()))
+    if (failedConnections.contains(targetUtf8))
     {
-        if (failedConnections[target.string()] >= MAX_LOAD_ATTEMPTS)
+        if (failedConnections[targetUtf8] >= maxLoadAttempts)
         {
-            sdk->logger->ErrorF(handle, "Resource %s has exceeded maximum amount of load attempts.", target.string().c_str());
+            sdk->logger->ErrorF(handle, "Resource %s has exceeded maximum amount of load attempts.", targetUtf8.c_str());
             return;
         }
     }
@@ -386,21 +413,22 @@ void Play(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
 
     stopAndReleaseChannel(channelID);
 
-    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(target.string().c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
+    sdk->logger->InfoF(handle, "FMOD::System::createSound: %s", FMOD_ErrorString(pSystem->createStream(targetUtf8.c_str(), mode | FMOD_NONBLOCKING, nullptr, &loadData[channelID]->sound)));
 
     loadData[channelID]->fade = fade;
     loadData[channelID]->startPos = startPos;
     loadData[channelID]->volume = volume;
     loadData[channelID]->mode = mode;
     loadData[channelID]->play = true; // Sound is loading, check if loading has finished
-    loadData[channelID]->path = target.string();
+    loadData[channelID]->path = targetUtf8;
     aFrame->code++; // skip ParamEnd
 }
 
-void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     int32_t channelID;
     float volume;
@@ -423,10 +451,11 @@ void SetVolume(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, flo
     aFrame->code++; // skip ParamEnd
 }
 
-void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     float falloff;
     RED4ext::GetParameter(aFrame, &falloff);
@@ -437,17 +466,18 @@ void Set3DFalloff(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, 
     aFrame->code++; // skip ParamEnd
 }
 
-void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     float min;
     float max;
     RED4ext::GetParameter(aFrame, &min);
     RED4ext::GetParameter(aFrame, &max);
 
-    for (int i = 0; i <= CHANNELS; i++)
+    for (int i = 0; i <= channelCount; i++)
     {
         if (pChannels[i])
         {
@@ -458,11 +488,11 @@ void Set3DMinMax(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, f
     aFrame->code++; // skip ParamEnd
 }
 
-void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
-    RED4EXT_UNUSED_PARAMETER(aFrame);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     int32_t channelID;
     RED4ext::GetParameter(aFrame, &channelID);
@@ -479,10 +509,11 @@ void Stop(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* a
     aFrame->code++; // skip ParamEnd
 }
 
-void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     int32_t channelID;
     RED4ext::Vector4 pos;
@@ -516,10 +547,11 @@ void SetChannelTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* a
     aFrame->code++; // skip ParamEnd
 }
 
-void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, float* aOut, int64_t a4)
+void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* aFrame, void* aOut, int64_t a4)
 {
     RED4EXT_UNUSED_PARAMETER(a4);
     RED4EXT_UNUSED_PARAMETER(aContext);
+    RED4EXT_UNUSED_PARAMETER(aOut);
 
     RED4ext::Vector4 pos;
     RED4ext::Vector4 forward;
@@ -560,7 +592,7 @@ void SetListenerTransform(RED4ext::IScriptable* aContext, RED4ext::CStackFrame* 
 
 void checkSoundLoad()
 {
-    for (int i = 0; i <= CHANNELS; i++)
+    for (int i = 0; i <= channelCount; i++)
     {
         if (!loadData[i]->sound || !loadData[i]->play)
         {
@@ -666,7 +698,12 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
     {
         sdk = aSdk;
         handle = aHandle;
-        root = getExePath();
+        gameBinDir = getGameBinDir();
+        if (gameBinDir.empty())
+        {
+            sdk->logger->ErrorF(handle, "%s", "Failed to determine the game executable directory");
+            return false;
+        }
 
         FMOD_RESULT result = FMOD::System_Create(&pSystem);
         logError(result, "FMOD::System_Create");
@@ -676,7 +713,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
             return false;
         }
 
-        result = pSystem->init(CHANNELS + 1, FMOD_INIT_3D_RIGHTHANDED, nullptr);
+        result = pSystem->init(channelCount + 1, FMOD_INIT_3D_RIGHTHANDED, nullptr);
         logError(result, "FMOD::System::init");
         if (result != FMOD_OK)
         {
@@ -688,7 +725,7 @@ RED4EXT_C_EXPORT bool RED4EXT_CALL Main(RED4ext::v1::PluginHandle aHandle, RED4e
         systemInitialized = true;
         sdk->logger->InfoF(handle, "FMOD::System::set3DSettings %s", FMOD_ErrorString(pSystem->set3DSettings(1, 1, 0.325)));
 
-        for (int i = 0; i <= CHANNELS; i++)
+        for (int i = 0; i <= channelCount; i++)
         {
             loadData[i] = new SoundLoadData{};
         }
@@ -731,7 +768,7 @@ RED4EXT_C_EXPORT void RED4EXT_CALL Query(RED4ext::v1::PluginInfo* aInfo)
 {
     aInfo->name = L"RadioExt";
     aInfo->author = L"keanuWheeze";
-    aInfo->version = RED4EXT_V1_SEMVER(2, 3, 0);
+    aInfo->version = radioExtVersion;
     aInfo->runtime = RED4EXT_V1_RUNTIME_VERSION_INDEPENDENT;
     aInfo->sdk = RED4EXT_V1_SDK_VERSION_1_0_0_COMPAT_0_5_0;
 }

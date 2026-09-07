@@ -7,7 +7,7 @@
 --    * You may not fork this code and make your own competing version of this mod available for download without my permission.
 -------------------------------------------------------------------------------------------------------------------------------
 
-local minR4Version = "0.9.0"
+local minR4Version = "2.3.0"
 local initializationError = true
 local audio = require("modules/utils/audioEngine")
 local utils = require("modules/utils/utils")
