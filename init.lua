@@ -12,7 +12,10 @@ local initializationError = true
 local audio = require("modules/utils/audioEngine")
 local utils = require("modules/utils/utils")
 
-local radio = {
+---@class radioMod
+---@field runtimeData {inMenu: boolean, inGame: boolean}
+---@field radioManager radioManager
+local radioMod = {
     runtimeData = {
         inMenu = false,
         inGame = false
@@ -25,7 +28,7 @@ local radio = {
     logger = require("modules/utils/logger")
 }
 
-function radio:new()
+function radioMod:new()
     registerForEvent("onInit", function()
         math.randomseed(os.time())
 
@@ -84,7 +87,7 @@ function radio:new()
     return self
 end
 
-return radio:new()
+return radioMod:new()
 
 -- NoSync:
 -- Car off, pocket on => Car turns on when entering
