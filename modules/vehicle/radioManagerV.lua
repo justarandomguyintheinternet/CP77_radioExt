@@ -1,5 +1,9 @@
 local managerV = {}
 
+---@class radioManagerV
+---@field manager radioManager
+---@field isMounted boolean
+---@field rm radioMod
 function managerV:new(manager, radioMod)
 	local o = {}
 

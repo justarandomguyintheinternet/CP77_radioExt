@@ -112,20 +112,26 @@ function Cron.AfterTicks(ticks, callback, data)
 end
 
 ---@param timerId any
----@return void
+---@return number?
 function Cron.Halt(timerId)
     if type(timerId) == 'table' then
         timerId = timerId.id
     end
 
+    local remaining = nil
+
     for _, timer in ipairs(timers) do
         if timer.id == timerId then
             timer.active = false
             timer.halted = true
+            remaining = timer.delay
+
             prune = true
             break
         end
     end
+
+    return remaining
 end
 
 function Cron.HaltAll()

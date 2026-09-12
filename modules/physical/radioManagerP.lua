@@ -1,5 +1,9 @@
 local utils = require("modules/utils/utils")
 
+---@class radioManagerP
+---@field manager radioManager
+---@field radioObjects table
+---@field cameraTransform userdata
 local managerP = {}
 
 function managerP:new(manager)

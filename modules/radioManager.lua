@@ -1,6 +1,11 @@
 local config = require("modules/utils/config")
 local utils = require("modules/utils/utils")
 
+---@class radioManager
+---@field rm radioMod
+---@field radios table
+---@field managerV radioManagerV
+---@field managerP radioManagerP
 local radioManager = {}
 
 local extensions = {
