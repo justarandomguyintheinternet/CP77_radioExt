@@ -9,7 +9,7 @@
 #include <vector>
 #include "SoundLoadData.hpp"
 
-constexpr RED4ext::v1::SemVer radioExtVersion{2, 3, 0, {}};
+constexpr RED4ext::v1::SemVer radioExtVersion{2, 3, 1, {}};
 constexpr int32_t channelCount = 64;
 constexpr uint32_t maxLoadAttempts = 3;
 
