@@ -80,7 +80,7 @@ function radio:setupRecord(metadata, path)
     end
 end
 
-function radio:load(metadata, lengthData, path, index) -- metadata is the data provided by the user, lengthData is the length of all songs
+function radio:load(metadata, lengthData, path, stationIndex) -- metadata is the data provided by the user, lengthData is the length of all songs
     for k, v in pairs(lengthData) do
         table.insert(self.songs, { path = k, length = v })
     end
@@ -90,7 +90,7 @@ function radio:load(metadata, lengthData, path, index) -- metadata is the data p
     self.volume = metadata.volume
     self.metadata = metadata
     self.path = path
-    self.index = index + 13 -- Hardcoded 13 vanilla stations
+    self.index = stationIndex
 
     self:setupRecord(metadata, path)
     self:verifyOrder()
@@ -137,15 +137,18 @@ end
 function radio:activate(channel, updateUI)
     if self.channels[channel] then return end
 
-    self.channels[channel] = true
+    local playRequested = true
     if not self.metadata.streamInfo.isStream then
         if #self.songs > 0 then
-            audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
+            playRequested = audio.playFile(channel, "plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios\\" .. self.currentSong.path, self.tick * 1000, self.volume)
         end
     else
-        audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
+        playRequested = audio.playFile(channel, self.metadata.streamInfo.streamURL, -1, self.volume) -- -1 indicates to open path as stream
     end
 
+    if not playRequested then return end
+
+    self.channels[channel] = true
     if updateUI == true or updateUI == nil then
         self:tryUpdateUI()
     end

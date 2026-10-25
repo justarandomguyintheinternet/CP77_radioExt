@@ -28,12 +28,13 @@ end
 function audio.playFile(id, path, time, volume, fade)
     local timeSinceLastPlayed = audio.timeSinceLastPlayedByChannel[id] or maxRequestInterval + 1
     if timeSinceLastPlayed < maxRequestInterval then
-        return
+        return false
     end
 
     audio.timeSinceLastPlayedByChannel[id] = 0
     fade = fade or 0.75
     RadioExt.Play(id, path, time, getAdjustedVolume(id, volume), fade)
+    return true
 end
 
 function audio.stopAudio(id)

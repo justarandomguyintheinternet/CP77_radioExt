@@ -14,17 +14,19 @@ local function handleActionNotifier(controller, evt)
 end
 
 function observersP.init(radioMod)
-    -- 13 total vanilla stations, 4 is the first one
     Override("RadioControllerPS", "OnNextStation", function (this, evt, wrapped)
         if not canRespondToAction(this) then
             return EntityNotificationType.DoNotNotifyEntity
         end
 
-        if RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation) > 12 or this.activeStation > 13 then
+        local lastVanillaStationIndex = radioMod.radioManager:getLastVanillaStationIndex()
+        local firstCustomStationIndex = radioMod.radioManager:getFirstCustomStationIndex()
+
+        if RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation) >= lastVanillaStationIndex or this.activeStation >= firstCustomStationIndex then
             this.previousStation = this.activeStation
             this.activeStation = math.max(RadioStationDataProvider.GetRadioStationUIIndex(this.activeStation), this.activeStation) + 1
-            if this.activeStation > 13 + #radioMod.radioManager.radios then
-                this.activeStation = 12
+            if this.activeStation > radioMod.radioManager:getLastCustomStationIndex() then
+                this.activeStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(lastVanillaStationIndex))
                 return wrapped(evt)
             end
 
@@ -43,18 +45,20 @@ function observersP.init(radioMod)
             return wrapped(evt)
         end
 
-        if this.activeStation > 13 then
+        local firstCustomStationIndex = radioMod.radioManager:getFirstCustomStationIndex()
+
+        if this.activeStation >= firstCustomStationIndex then
             this.previousStation = this.activeStation
             this.activeStation = this.activeStation - 1
-            if this.activeStation < 14 then
-                this.activeStation = 4
+            if this.activeStation < firstCustomStationIndex then
+                this.activeStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(0))
                 return wrapped(evt)
             end
 
             return handleActionNotifier(this, evt)
-        elseif this.activeStation == 4 then
+        elseif this.activeStation == EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(0)) then
             this.previousStation = this.activeStation
-            this.activeStation = 13 + #radioMod.radioManager.radios
+            this.activeStation = radioMod.radioManager:getLastCustomStationIndex()
             return handleActionNotifier(this, evt)
         else
             return wrapped(evt)
@@ -63,15 +67,9 @@ function observersP.init(radioMod)
 
     Observe("Radio", "PlayGivenStation", function (this)
         local active = this:GetDevicePS():GetActiveStationIndex()
+        local radio = radioMod.radioManager:getRadioByIndex(active)
 
-        if active > 13 then
-            local radio = radioMod.radioManager:getRadioByIndex(active)
-
-            if not radio then
-                radioMod.radioManager.managerP:removeObjectByHandle(this)
-                return
-            end
-
+        if radio then
             GameObject.AudioSwitch(this, "radio_station", "station_none", "radio")
             local object = radioMod.radioManager.managerP:getObjectByHandle(this)
             if object then
@@ -102,8 +100,7 @@ function observersP.init(radioMod)
 
     Override("RadioInkGameController", "SetupStationLogo", function (this, wrapped)
         local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
-        local radio = active > 13 and radioMod.radioManager:getRadioByIndex(active) or nil
-
+        local radio = radioMod.radioManager:getRadioByIndex(active)
 
         if radio then
             local iconRecord = TweakDBInterface.GetUIIconRecord(radio.icon)
@@ -117,10 +114,6 @@ function observersP.init(radioMod)
 
     ObserveAfter("RadioInkGameController", "TurnOn", function (this)
         local active = this:GetOwner():GetDevicePS():GetActiveStationIndex()
-        if active < 14 then
-            return
-        end
-
         local radio = radioMod.radioManager:getRadioByIndex(active)
         if radio then
             inkTextRef.SetText(this.stationNameWidget, radio.name)

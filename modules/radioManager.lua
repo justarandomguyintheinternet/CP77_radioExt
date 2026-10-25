@@ -154,6 +154,22 @@ function radioManager:init()
     self.managerV = require("modules/vehicle/radioManagerV"):new(self, self.rm)
 end
 
+function radioManager:getVanillaStationCount()
+    return RadioStationDataProvider.GetStationsCount()
+end
+
+function radioManager:getFirstCustomStationIndex()
+    return self:getVanillaStationCount()
+end
+
+function radioManager:getLastVanillaStationIndex()
+    return self:getFirstCustomStationIndex() - 1
+end
+
+function radioManager:getLastCustomStationIndex()
+    return self:getLastVanillaStationIndex() + #self.radios
+end
+
 function radioManager:loadRadios() -- Loads radios
     local radios = RadioExt.GetFolders("plugins\\cyber_engine_tweaks\\mods\\radioExt\\radios")
     if not radios then return end
@@ -169,7 +185,7 @@ function radioManager:loadRadios() -- Loads radios
 
                 local r = require("modules/radioStation"):new(self.rm)
 
-                r:load(metadata, songs, path, #self.radios + 1)
+                r:load(metadata, songs, path, self:getFirstCustomStationIndex() + #self.radios)
                 self.radios[#self.radios + 1] = r
             end)
 

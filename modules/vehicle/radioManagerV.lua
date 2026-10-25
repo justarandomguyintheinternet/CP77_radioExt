@@ -35,10 +35,6 @@ function managerV:disableCustomRadio() -- Just stop playback
     for _, radio in pairs(self.manager.radios) do
         radio:deactivate(-1)
     end
-
-    if GetMountedVehicle(GetPlayer()) then
-        GetMountedVehicle(GetPlayer()):GetBlackboard():SetBool(GetAllBlackboardDefs().Vehicle.VehRadioState, false)
-    end
 end
 
 function managerV:update()

@@ -16,9 +16,11 @@ local function getTrackName(path, isStream)
     return fileName:match("(.+)%..+$") or fileName
 end
 
-local function getNextStationIndex(currentStation)
+local function getNextStationIndex(currentStation, radioManager)
+    local firstCustomStationIndex = radioManager:getFirstCustomStationIndex()
+
     -- Convert vanilla station to UI index (Same as what is stored in station record)
-    if currentStation < 14 and currentStation ~= -1 then
+    if currentStation < firstCustomStationIndex and currentStation ~= -1 then
         currentStation = RadioStationDataProvider.GetRadioStationUIIndex(currentStation)
     end
 
@@ -39,7 +41,7 @@ local function getNextStationIndex(currentStation)
 
     nextStation = stations[nextStation].record:Index()
 
-    if nextStation < 14 then
+    if nextStation < firstCustomStationIndex then
         nextStation = EnumInt(RadioStationDataProvider.GetRadioStationByUIIndex(nextStation))
     end
 
@@ -88,7 +90,7 @@ function observersV.init(radioMod)
     -- For custom: Turns of vehicle radio, sets station for pocket radio
     Override("QuickSlotsManager", "SendRadioEvent", function (this, toggle, setStation, station, wrapped)
         radioMod.logger.log("QuickSlotsManager::SendRadioEvent")
-        if station > 13 then
+        if station >= radioMod.radioManager:getFirstCustomStationIndex() then
             local vehicle = GetMountedVehicle(GetPlayer())
 
             if vehicle then
@@ -269,7 +271,7 @@ function observersV.init(radioMod)
         if not this.settings:GetCycleButtonPress() then return wrapped(evt) end
         if this:IsRestricted() or this:ShouldIgnoreEvents() then return end
 
-        local nextStation = getNextStationIndex(this.station)
+        local nextStation = getNextStationIndex(this.station, radioMod.radioManager)
 
         this.selectedStation = nextStation
         this.station = this.selectedStation
@@ -281,13 +283,17 @@ function observersV.init(radioMod)
         this:TurnOn(true)
     end)
 
-    Observe("PocketRadio", "TurnOn", function (this)
+    -- Reconcile after vanilla so its input guards are reflected in isOn.
+    ObserveAfter("PocketRadio", "TurnOn", function (this)
         radioMod.logger.log("PocketRadio::TurnOn")
-        local activeVRadio = radioMod.radioManager.managerV:getActiveStationData()
         local radio = radioMod.radioManager:getRadioByIndex(this.station)
 
-        if not GetMountedVehicle(GetPlayer()) and radio then --and (not activeVRadio)
-            radioMod.radioManager.managerV:switchToRadio(radio)
+        if not GetMountedVehicle(GetPlayer()) then
+            if this.isOn and radio then
+                radioMod.radioManager.managerV:switchToRadio(radio)
+            else
+                radioMod.radioManager.managerV:disableCustomRadio()
+            end
         elseif not radio then
             radioMod.radioManager.managerV:disableCustomRadio()
         end
